@@ -14,11 +14,13 @@ interface Preview {
   mutationStats: { changedTokenCount: number; beforeAfterTokens: Array<{ position: number; beforeTokenId: number; afterTokenId: number }> };
 }
 
-export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated }: {
+export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, mobileOpen = false, onMobileClose }: {
   nodes: GraphNodeRecord[];
   parentIds: [string, string];
   setParentIds: (value: [string, string]) => void;
   onCreated: (id: string) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }) {
   const [mode, setMode] = useState<"descendant" | "genesis">("descendant");
   const [name, setName] = useState("");
@@ -70,11 +72,11 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated }:
   const short = (id: string) => nodes.find((node) => node.id === id)?.genomeHex.slice(0, 10) ?? "—";
   const nodeName = (id: string) => nodes.find((node) => node.id === id)?.name ?? `${id.slice(0, 6)}…`;
   const shown = result ?? preview;
-  return <aside className="glass flex max-h-[calc(100vh-5rem)] w-[390px] shrink-0 flex-col overflow-hidden rounded-3xl">
-    <div className="border-b border-white/10 p-5"><p className="text-xs uppercase tracking-[.24em] text-fuchsia-300">{mode === "descendant" ? "Create a descendant" : "Create a genesis root"}</p><h2 className="mt-1 text-xl font-semibold">{mode === "descendant" ? "繁衍新节点" : "创建创世节点"}</h2>
+  return <aside className={`${mobileOpen ? "flex" : "hidden"} glass fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] top-16 z-30 min-h-0 flex-col overflow-hidden rounded-3xl shadow-2xl md:static md:flex md:max-h-[calc(100vh-5rem)] md:w-[390px] md:shrink-0 md:shadow-none`}>
+    <div className="border-b border-white/10 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[.2em] text-fuchsia-300 sm:tracking-[.24em]">{mode === "descendant" ? "Create a descendant" : "Create a genesis root"}</p><h2 className="mt-1 text-xl font-semibold">{mode === "descendant" ? "繁衍新节点" : "创建创世节点"}</h2></div>{onMobileClose && <button type="button" onClick={onMobileClose} aria-label="关闭创建面板" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 text-xl md:hidden">×</button>}</div>
       <div className="mt-4 grid grid-cols-2 rounded-xl bg-black/25 p-1 text-sm"><button type="button" onClick={() => { setMode("descendant"); setError(""); }} className={`rounded-lg px-3 py-2 ${mode === "descendant" ? "bg-white/10 text-white" : "text-slate-500"}`}>繁衍</button><button type="button" onClick={() => { setMode("genesis"); setError(""); }} className={`rounded-lg px-3 py-2 ${mode === "genesis" ? "bg-white/10 text-cyan-200" : "text-slate-500"}`}>创世</button></div>
     </div>
-    <div className="overflow-y-auto p-5">
+    <div className="min-h-0 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
       {mode === "genesis" ? <form onSubmit={submitGenesis} className="space-y-4">
         <p className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-xs leading-5 text-slate-400">创建一个没有亲本的 Generation 0 根节点。其 Hash 使用这个世界永久保存的创世时间戳计算；不会替换或改写已有七个初始节点。</p>
         <label className="block text-sm text-slate-300">创世节点名称
