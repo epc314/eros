@@ -3,7 +3,6 @@ import { env } from "cloudflare:workers";
 export interface ErosHostedEnv {
   DB: D1Database;
   EROS_IMAGES: R2Bucket;
-  IMAGES?: ImagesBinding;
   BFL_API_KEY?: string;
   IMAGE_PROVIDER?: string;
   IMAGE_API_KEY?: string;
