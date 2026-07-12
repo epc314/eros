@@ -77,6 +77,10 @@ const imageColumns = `id, node_id AS nodeId, provider, provider_model AS provide
   prompt_version AS promptVersion, provider_seed AS providerSeed, variation_id AS variationId,
   image_url AS imageUrl, r2_key AS r2Key, content_type AS contentType, width, height,
   is_primary AS isPrimary, status, error_message AS errorMessage, created_at AS createdAt`;
+const imageDisplayColumns = `id, node_id AS nodeId, provider, provider_model AS providerModel,
+  variation_id AS variationId, image_url AS imageUrl, r2_key AS r2Key,
+  content_type AS contentType, width, height, is_primary AS isPrimary,
+  status, error_message AS errorMessage, created_at AS createdAt`;
 
 function normalizeImage(row: HostedImage): HostedImage {
   return { ...row, isPrimary: Boolean(row.isPrimary), imageUrl: row.r2Key ? `/api/images/${row.id}` : row.imageUrl,
@@ -147,7 +151,7 @@ export async function hostedWorldGraph() {
       (SELECT COUNT(*) FROM generated_images i WHERE i.node_id=n.id AND i.status='COMPLETED') AS imageCount
       FROM nodes n WHERE n.world_id=?`).bind(WORLD_ID),
     db().prepare(`SELECT ${reproductionColumns} FROM reproductions`),
-    db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE status='COMPLETED' ORDER BY is_primary DESC, created_at DESC`),
+    db().prepare(`SELECT ${imageDisplayColumns} FROM generated_images WHERE status='COMPLETED' ORDER BY is_primary DESC, created_at DESC`),
   ]);
   const nodes = (nodesResult.results as unknown as HostedNode[]).map(normalizeNode);
   const edges = edgesResult.results as unknown as Array<{ id: string; parentNodeId: string; childNodeId: string; createdAt: string }>;
@@ -192,7 +196,7 @@ export async function getHostedNode(id: string) {
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
       FROM node_descriptions d WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id)),
-    all<HostedImage>(db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id)),
+    all<HostedImage>(db().prepare(`SELECT ${imageDisplayColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id)),
   ]);
   const parents = reproduction ? (await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (?,?)`).bind(reproduction.parentLowId, reproduction.parentHighId))).map(normalizeNode) : [];
   const children = childEdges.length ? (await all<HostedNode>(
@@ -236,7 +240,7 @@ export async function previewHostedReproduction(parentAId: string, parentBId: st
   const parents = await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id=? AND id IN (?,?)`).bind(WORLD_ID, parentAId, parentBId));
   if (parents.length !== 2) throw new ApiFailure("PARENT_NOT_FOUND", "Both nodes must already exist.", 404);
   const parentA = normalizeNode(parents.find(({ id }) => id === parentAId)!); const parentB = normalizeNode(parents.find(({ id }) => id === parentBId)!);
-  if (parentA.isDead || parentB.isDead) throw new ApiFailure("DEAD_PARENT", "死亡节点不能参与繁衍。", 409);
+  if (parentA.isDead || parentB.isDead) throw new ApiFailure("DEAD_PARENT", "死亡存在不能参与繁衍。", 409);
   const result = reproduce(parentA, parentB, name);
   return { result, mutationStats: calculateMutationStats(result.baseGenomeHex, result.childGenomeHex, result.flippedBitPositions) };
 }
@@ -286,7 +290,7 @@ export async function addHostedDescription(nodeId: string, body: string, authorL
   await ensureHostedSchema();
   const node = await first<{ id: string; recordsLocked: number }>(db().prepare("SELECT id,records_locked AS recordsLocked FROM nodes WHERE id=?").bind(nodeId));
   if (!node) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
-  if (node.recordsLocked) throw new ApiFailure("NODE_RECORDS_LOCKED", "该节点的记述已永久封存。", 409);
+  if (node.recordsLocked) throw new ApiFailure("NODE_RECORDS_LOCKED", "该存在的记述已永久封存。", 409);
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const recent = await all<{ body: string }>(db().prepare("SELECT body FROM node_descriptions WHERE node_id=? AND created_at>=?").bind(nodeId, since));
   if (recent.some((item) => item.body.normalize("NFKC").toLowerCase() === body.toLowerCase()))
@@ -302,9 +306,9 @@ export async function setHostedNodeLifeStatus(nodeId: string, action: "die" | "r
   const rawNode = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(nodeId));
   if (!rawNode) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
   const node = normalizeNode(rawNode);
-  if (node.recordsLocked) throw new ApiFailure("NODE_RECORDS_LOCKED", "该节点已永久封存，不能改变生死状态。", 409);
+  if (node.recordsLocked) throw new ApiFailure("NODE_RECORDS_LOCKED", "该存在已永久封存，不能改变生死状态。", 409);
   const nextDead = action === "die";
-  if (node.isDead === nextDead) throw new ApiFailure("LIFE_STATUS_UNCHANGED", nextDead ? "该节点已经死亡。" : "该节点已经复活。", 409);
+  if (node.isDead === nextDead) throw new ApiFailure("LIFE_STATUS_UNCHANGED", nextDead ? "该存在已经死亡。" : "该存在已经复活。", 409);
   const createdAt = new Date().toISOString();
   const description = { id: newRecordId(), nodeId, body, authorLabel: null, status: "VISIBLE", kind: (nextDead ? "DEATH" : "REVIVAL") as DescriptionKind, createdAt, trueCount: 0, falseCount: 0 };
   await db().batch([

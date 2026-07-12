@@ -3,9 +3,9 @@ import { getHostedEnv } from "@/lib/hosted/env";
 import { getHostedImageRecord } from "@/lib/hosted/repository";
 import { createJpegThumbnail } from "@/lib/image/thumbnail";
 
-const THUMBNAIL_WIDTH = 384;
-const THUMBNAIL_HEIGHT = 224;
-const THUMBNAIL_QUALITY = 50;
+const THUMBNAIL_WIDTH = 512;
+const THUMBNAIL_HEIGHT = 320;
+const THUMBNAIL_QUALITY = 55;
 
 function objectResponse(object: R2ObjectBody, fallbackType: string): Response {
   const headers = new Headers(); object.writeHttpMetadata(headers);
@@ -22,7 +22,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const environment = getHostedEnv();
     const record = await getHostedImageRecord(id);
     if (!record?.r2Key) throw new ApiFailure("IMAGE_NOT_FOUND", "Image not found.", 404);
-    const thumbnailKey = `thumbnails-v2/${id}.jpg`;
+    const thumbnailKey = `thumbnails-v3/${id}.jpg`;
     const existing = await environment.EROS_IMAGES.get(thumbnailKey);
     if (existing) return objectResponse(existing, "image/jpeg");
 

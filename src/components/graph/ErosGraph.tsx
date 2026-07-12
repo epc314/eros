@@ -106,18 +106,18 @@ function GraphCanvas() {
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1 md:mt-0 md:flex-wrap md:overflow-visible">
           <select aria-label="代数过滤" value={generation} onChange={(event) => setGeneration(event.target.value)} className="glass min-h-11 shrink-0 rounded-xl px-3 text-sm"><option value="all">全部代数</option>{generations.map((item) => <option key={item} value={item}>Generation {item}</option>)}</select>
           <button onClick={() => setRootsOnly((value) => !value)} className={`glass min-h-11 shrink-0 rounded-xl px-3 text-sm ${rootsOnly ? "text-cyan-300" : "text-slate-400"}`}>只看创世</button>
-          <select aria-label="关系过滤" value={focusMode} onChange={(event) => setFocusMode(event.target.value as typeof focusMode)} className="glass min-h-11 shrink-0 rounded-xl px-3 text-sm"><option value="all">完整图谱</option><option value="ancestors">所选节点祖先</option><option value="descendants">所选节点后代</option></select>
+          <select aria-label="关系过滤" value={focusMode} onChange={(event) => setFocusMode(event.target.value as typeof focusMode)} className="glass min-h-11 shrink-0 rounded-xl px-3 text-sm"><option value="all">完整图谱</option><option value="ancestors">所选存在祖先</option><option value="descendants">所选存在后代</option></select>
           <button onClick={() => fitView({ duration: 500, padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 })} className="glass min-h-11 shrink-0 rounded-xl px-3 text-sm text-slate-300">适应画布</button>
         </div>
       </div>
       <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
         <Background color="#253044" gap={26} size={1} /><Controls position="bottom-left" showInteractive={false}/>{!isMobile && <MiniMap position="bottom-right" pannable zoomable nodeColor={(node) => (node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
       </ReactFlow>
-      <div className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs text-slate-400 sm:block">{graph.nodes.length} 节点 · {graph.edges.length} 亲本边 · 点击节点查看详情</div>
+      <div className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs text-slate-400 sm:block">{graph.nodes.length} 存在 · {graph.edges.length} 亲本边 · 点击存在查看详情</div>
       <button type="button" onClick={() => { setSelectedId(null); setMobilePanelOpen(true); }} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-3 z-20 min-h-12 rounded-full bg-gradient-to-r from-fuchsia-500 to-cyan-500 px-5 text-sm font-semibold text-white shadow-xl shadow-fuchsia-950/40 md:hidden">繁衍 / 创世{parentIds.filter(Boolean).length ? ` · ${parentIds.filter(Boolean).length}/2` : ""}</button>
     </section>
     <ReproductionPanel nodes={payload.nodes} parentIds={parentIds} setParentIds={setParentIds} mobileOpen={mobilePanelOpen} onMobileClose={() => setMobilePanelOpen(false)} onCreated={(id) => { setSelectedId(id); setMobilePanelOpen(false); void load(); }} />
-    {selectedId && <NodeDetailPanel nodeId={selectedId} onClose={() => setSelectedId(null)} onSelectParent={selectAsParent} onNodeChanged={load} />}
+    {selectedId && <NodeDetailPanel key={selectedId} nodeId={selectedId} initialNode={nodeById.get(selectedId)} onClose={() => setSelectedId(null)} onSelectParent={selectAsParent} onNodeChanged={load} />}
   </main>;
 }
 

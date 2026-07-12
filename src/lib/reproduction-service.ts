@@ -15,7 +15,7 @@ export async function previewReproduction(parentAId: string, parentBId: string, 
   if (parents.length !== 2) throw new ApiFailure("PARENT_NOT_FOUND", "Both nodes must already exist.", 404);
   const parentA = parents.find(({ id }) => id === parentAId)!;
   const parentB = parents.find(({ id }) => id === parentBId)!;
-  if (parentA.isDead || parentB.isDead) throw new ApiFailure("DEAD_PARENT", "死亡节点不能参与繁衍。", 409);
+  if (parentA.isDead || parentB.isDead) throw new ApiFailure("DEAD_PARENT", "死亡存在不能参与繁衍。", 409);
   const result = reproduce(parentA, parentB, name);
   return { result, mutationStats: calculateMutationStats(result.baseGenomeHex, result.childGenomeHex, result.flippedBitPositions) };
 }
