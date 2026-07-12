@@ -5,6 +5,7 @@ import { splitGenome } from "./protocol/chromosomes";
 import { createGenesisGenome, createNodeId } from "./protocol/genesis";
 import { bytesToHex } from "./protocol/hex";
 import { createNameKey, normalizeName } from "./protocol/normalization";
+import { EROS_BIRTH_RECORD, EROS_DEATH_RECORD, genesisBirthRecord } from "./story";
 
 export const WORLD_ID = "eros-world";
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -32,14 +33,20 @@ export async function initializeWorld(client: PrismaClient, now: () => number = 
     const nodes = [];
     for (const rawName of GENESIS_NODE_NAMES) {
       const name = normalizeName(rawName);
+      const nameKey = createNameKey(name);
       const genome = createGenesisGenome({ name, timestampMs });
       const genomeHex = bytesToHex(genome);
       const chromosomes = splitGenome(genomeHex);
+      const isEros = nameKey === "eros";
       nodes.push(await tx.node.create({ data: {
         id: createNodeId(genome), worldId: world.id, protocolVersion: PROTOCOL_VERSION,
-        promptVersion: IMAGE_PROMPT_VERSION, type: "GENESIS", name, nameKey: createNameKey(name),
+        promptVersion: IMAGE_PROMPT_VERSION, type: "GENESIS", name, nameKey,
         genomeHex, chromosome0Hex: chromosomes.chromosome0, chromosome1Hex: chromosomes.chromosome1,
-        generation: 0,
+        generation: 0, isDead: isEros, recordsLocked: isEros,
+        descriptions: { create: isEros ? [
+          { id: newRecordId(), body: EROS_BIRTH_RECORD, kind: "BIRTH" },
+          { id: newRecordId(), body: EROS_DEATH_RECORD, kind: "DEATH", createdAt: new Date(Date.now() + 1_000) },
+        ] : [{ id: newRecordId(), body: genesisBirthRecord(name), kind: "BIRTH" }] },
       } }));
     }
     return { world, nodes, created: true };

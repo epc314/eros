@@ -40,6 +40,12 @@ function GraphCanvas() {
   }, []);
 
   const nodeById = useMemo(() => new Map(payload?.nodes.map((node) => [node.id, node]) ?? []), [payload]);
+  useEffect(() => {
+    setParentIds((current) => {
+      const next = current.map((id) => id && nodeById.get(id)?.isDead ? "" : id) as [string, string];
+      return next[0] === current[0] && next[1] === current[1] ? current : next;
+    });
+  }, [nodeById]);
   const entitySummaries = useMemo(() => {
     const summaries = new Map<string, { primaryEntity: string; primaryEntityZh: string; auxiliaryEntities: string[]; auxiliaryEntitiesZh: string[] }>();
     for (const node of payload?.nodes ?? []) {
@@ -72,6 +78,7 @@ function GraphCanvas() {
       const summary = entitySummaries.get(node.id)!;
       return { id: node.id, type: "eros", position: { x: 0, y: 0 }, data: {
         name: node.name, genomeHex: node.genomeHex, type: node.type, generation: node.generation,
+        isDead: node.isDead,
         descriptionCount: node._count.descriptions, imageCount: node._count.images,
         image: node.images[0]?.thumbnailUrl ?? node.images[0]?.imageDataUrl ?? node.images[0]?.imageUrl ?? undefined,
         instability: node.reproduction?.mutationBitCount,
@@ -83,6 +90,7 @@ function GraphCanvas() {
   }, [payload, query, generation, rootsOnly, selectedId, focusMode, parentIds, nodeById, entitySummaries]);
 
   function selectAsParent(id: string) {
+    if (nodeById.get(id)?.isDead) return;
     if (parentIds[0] === id || parentIds[1] === id) return;
     setParentIds(parentIds[0] ? [parentIds[0], id] : [id, parentIds[1]]);
     if (isMobile) setSelectedId(null);
@@ -109,7 +117,7 @@ function GraphCanvas() {
       <button type="button" onClick={() => { setSelectedId(null); setMobilePanelOpen(true); }} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-3 z-20 min-h-12 rounded-full bg-gradient-to-r from-fuchsia-500 to-cyan-500 px-5 text-sm font-semibold text-white shadow-xl shadow-fuchsia-950/40 md:hidden">繁衍 / 创世{parentIds.filter(Boolean).length ? ` · ${parentIds.filter(Boolean).length}/2` : ""}</button>
     </section>
     <ReproductionPanel nodes={payload.nodes} parentIds={parentIds} setParentIds={setParentIds} mobileOpen={mobilePanelOpen} onMobileClose={() => setMobilePanelOpen(false)} onCreated={(id) => { setSelectedId(id); setMobilePanelOpen(false); void load(); }} />
-    {selectedId && <NodeDetailPanel nodeId={selectedId} onClose={() => setSelectedId(null)} onSelectParent={selectAsParent} />}
+    {selectedId && <NodeDetailPanel nodeId={selectedId} onClose={() => setSelectedId(null)} onSelectParent={selectAsParent} onNodeChanged={load} />}
   </main>;
 }
 

@@ -8,7 +8,8 @@ export const SCHEMA_STATEMENTS = [
     prompt_version TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('GENESIS','DESCENDANT')),
     name TEXT NOT NULL, name_key TEXT NOT NULL, genome_hex TEXT NOT NULL UNIQUE,
     chromosome0_hex TEXT NOT NULL, chromosome1_hex TEXT NOT NULL,
-    generation INTEGER NOT NULL, created_at TEXT NOT NULL,
+    generation INTEGER NOT NULL, is_dead INTEGER NOT NULL DEFAULT 0,
+    records_locked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
     UNIQUE(world_id, name_key), FOREIGN KEY(world_id) REFERENCES worlds(id)
   )`,
   `CREATE INDEX IF NOT EXISTS nodes_world_generation_idx ON nodes(world_id, generation)`,
@@ -34,10 +35,16 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS parent_edges_child_idx ON parent_edges(child_node_id)`,
   `CREATE TABLE IF NOT EXISTS node_descriptions (
     id TEXT PRIMARY KEY, node_id TEXT NOT NULL, body TEXT NOT NULL, author_label TEXT,
-    status TEXT NOT NULL DEFAULT 'VISIBLE', created_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'VISIBLE', kind TEXT NOT NULL DEFAULT 'STORY', created_at TEXT NOT NULL,
     FOREIGN KEY(node_id) REFERENCES nodes(id)
   )`,
   `CREATE INDEX IF NOT EXISTS node_descriptions_node_created_idx ON node_descriptions(node_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS description_feedback (
+    id TEXT PRIMARY KEY, description_id TEXT NOT NULL, voter_key TEXT NOT NULL,
+    is_true INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    UNIQUE(description_id, voter_key), FOREIGN KEY(description_id) REFERENCES node_descriptions(id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS description_feedback_description_idx ON description_feedback(description_id)`,
   `CREATE TABLE IF NOT EXISTS generated_images (
     id TEXT PRIMARY KEY, node_id TEXT NOT NULL, provider TEXT NOT NULL, provider_model TEXT,
     provider_request_id TEXT, exact_prompt TEXT NOT NULL, prompt_version TEXT NOT NULL,

@@ -7,7 +7,7 @@ import { bytesToHex } from "@/lib/protocol/hex";
 import { initializeWorld } from "@/lib/world";
 
 async function clear() {
-  await prisma.generatedImage.deleteMany(); await prisma.nodeDescription.deleteMany(); await prisma.parentEdge.deleteMany();
+  await prisma.descriptionFeedback.deleteMany(); await prisma.generatedImage.deleteMany(); await prisma.nodeDescription.deleteMany(); await prisma.parentEdge.deleteMany();
   await prisma.reproduction.deleteMany(); await prisma.node.deleteMany(); await prisma.world.deleteMany();
 }
 
@@ -20,6 +20,10 @@ describe("world initialization", () => {
     expect(new Set(result.nodes.map(({ generation }) => generation))).toEqual(new Set([0]));
     expect(result.nodes.map(({ name }) => name).sort()).toEqual([...GENESIS_NODE_NAMES].sort());
     for (const node of result.nodes) expect(node.genomeHex).toBe(bytesToHex(createGenesisGenome({ name: node.name, timestampMs: 1_700_000_000_123n })));
+    const eros = await prisma.node.findFirstOrThrow({ where: { nameKey: "eros" }, include: { descriptions: { orderBy: { createdAt: "asc" } } } });
+    expect(eros).toMatchObject({ isDead: true, recordsLocked: true });
+    expect(eros.descriptions.map(({ kind }) => kind)).toEqual(["BIRTH", "DEATH"]);
+    expect(await prisma.node.count({ where: { isDead: false, recordsLocked: false } })).toBe(6);
   });
   it("is idempotent and never recalculates the timestamp", async () => {
     const first = await initializeWorld(prisma, () => 1000);

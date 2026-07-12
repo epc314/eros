@@ -6,6 +6,7 @@ import { bytesToHex } from "../protocol/hex";
 import { createNameKey, normalizeName } from "../protocol/normalization";
 import { reproduce } from "../protocol/reproduction";
 import { calculateMutationStats } from "../protocol/token-decoder";
+import { descendantBirthRecord, EROS_BIRTH_RECORD, EROS_DEATH_RECORD, genesisBirthRecord, type DescriptionKind } from "../story";
 import { getHostedEnv } from "./env";
 import { SCHEMA_STATEMENTS } from "./schema";
 
@@ -18,7 +19,12 @@ export interface HostedWorld {
 export interface HostedNode {
   id: string; worldId: string; protocolVersion: string; promptVersion: string;
   type: "GENESIS" | "DESCENDANT"; name: string; nameKey: string; genomeHex: string;
-  chromosome0Hex: string; chromosome1Hex: string; generation: number; createdAt: string;
+  chromosome0Hex: string; chromosome1Hex: string; generation: number;
+  isDead: boolean; recordsLocked: boolean; createdAt: string;
+}
+export interface HostedDescription {
+  id: string; nodeId: string; body: string; authorLabel: string | null; status: string;
+  kind: DescriptionKind; createdAt: string; trueCount: number; falseCount: number;
 }
 export interface HostedReproduction {
   id: string; childNodeId: string; parentLowId: string; parentHighId: string;
@@ -53,7 +59,7 @@ async function all<T>(query: D1PreparedStatement): Promise<T[]> { return (await 
 const nodeColumns = `id, world_id AS worldId, protocol_version AS protocolVersion,
   prompt_version AS promptVersion, type, name, name_key AS nameKey, genome_hex AS genomeHex,
   chromosome0_hex AS chromosome0Hex, chromosome1_hex AS chromosome1Hex,
-  generation, created_at AS createdAt`;
+  generation, is_dead AS isDead, records_locked AS recordsLocked, created_at AS createdAt`;
 const worldColumns = `id, name, protocol_version AS protocolVersion,
   genesis_timestamp_ms AS genesisTimestampMs, initialized_at AS initializedAt`;
 const reproductionColumns = `id, child_node_id AS childNodeId, parent_low_id AS parentLowId,
@@ -77,6 +83,10 @@ function normalizeImage(row: HostedImage): HostedImage {
     thumbnailUrl: row.r2Key ? `/api/thumbnails/${row.id}` : row.imageUrl, imageDataUrl: null };
 }
 
+function normalizeNode(row: HostedNode): HostedNode {
+  return { ...row, isDead: Boolean(row.isDead), recordsLocked: Boolean(row.recordsLocked) };
+}
+
 function configuredTimestamp(): bigint | undefined {
   const raw = getHostedEnv().EROS_WORLD_GENESIS_TIMESTAMP_MS?.trim();
   if (!raw) return undefined;
@@ -89,7 +99,7 @@ export async function initializeHostedWorld(now: () => number = Date.now) {
   await ensureHostedSchema();
   const existing = await first<HostedWorld>(db().prepare(`SELECT ${worldColumns} FROM worlds WHERE id = ?`).bind(WORLD_ID));
   if (existing) {
-    const nodes = await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id = ? ORDER BY name`).bind(WORLD_ID));
+    const nodes = (await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id = ? ORDER BY name`).bind(WORLD_ID))).map(normalizeNode);
     return { world: existing, nodes, created: false };
   }
   const timestampMs = configuredTimestamp() ?? BigInt(now());
@@ -97,21 +107,30 @@ export async function initializeHostedWorld(now: () => number = Date.now) {
   const world: HostedWorld = { id: WORLD_ID, name: PROJECT_NAME, protocolVersion: PROTOCOL_VERSION, genesisTimestampMs: timestampMs.toString(), initializedAt };
   const nodes = GENESIS_NODE_NAMES.map((rawName) => {
     const name = normalizeName(rawName);
+    const nameKey = createNameKey(name);
     const genome = createGenesisGenome({ name, timestampMs });
     const genomeHex = bytesToHex(genome);
     const chromosomes = splitGenome(genomeHex);
     return { id: createNodeId(genome), worldId: WORLD_ID, protocolVersion: PROTOCOL_VERSION,
-      promptVersion: IMAGE_PROMPT_VERSION, type: "GENESIS" as const, name, nameKey: createNameKey(name),
+      promptVersion: IMAGE_PROMPT_VERSION, type: "GENESIS" as const, name, nameKey,
       genomeHex, chromosome0Hex: chromosomes.chromosome0, chromosome1Hex: chromosomes.chromosome1,
-      generation: 0, createdAt: initializedAt };
+      generation: 0, isDead: nameKey === "eros", recordsLocked: nameKey === "eros", createdAt: initializedAt };
   });
+  const seedDescriptions = nodes.flatMap((node) => node.nameKey === "eros" ? [
+    { id: newRecordId(), nodeId: node.id, body: EROS_BIRTH_RECORD, kind: "BIRTH" as const, createdAt: initializedAt },
+    { id: newRecordId(), nodeId: node.id, body: EROS_DEATH_RECORD, kind: "DEATH" as const, createdAt: new Date(Date.parse(initializedAt) + 1_000).toISOString() },
+  ] : [{ id: newRecordId(), nodeId: node.id, body: genesisBirthRecord(node.name), kind: "BIRTH" as const, createdAt: initializedAt }]);
   await db().batch([
     db().prepare("INSERT OR IGNORE INTO worlds (id,name,protocol_version,genesis_timestamp_ms,initialized_at) VALUES (?,?,?,?,?)")
       .bind(world.id, world.name, world.protocolVersion, world.genesisTimestampMs, world.initializedAt),
     ...nodes.map((node) => db().prepare(`INSERT OR IGNORE INTO nodes
-      (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(node.id, node.worldId, node.protocolVersion, node.promptVersion, node.type,
-        node.name, node.nameKey, node.genomeHex, node.chromosome0Hex, node.chromosome1Hex, node.generation, node.createdAt)),
+      (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,is_dead,records_locked,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(node.id, node.worldId, node.protocolVersion, node.promptVersion, node.type,
+        node.name, node.nameKey, node.genomeHex, node.chromosome0Hex, node.chromosome1Hex, node.generation,
+        node.isDead ? 1 : 0, node.recordsLocked ? 1 : 0, node.createdAt)),
+    ...seedDescriptions.map((item) => db().prepare(`INSERT OR IGNORE INTO node_descriptions
+      (id,node_id,body,author_label,status,kind,created_at) VALUES (?,?,?,NULL,'VISIBLE',?,?)`)
+      .bind(item.id, item.nodeId, item.body, item.kind, item.createdAt)),
   ]);
   return { world, nodes, created: true };
 }
@@ -130,7 +149,7 @@ export async function hostedWorldGraph() {
     db().prepare(`SELECT ${reproductionColumns} FROM reproductions`),
     db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE status='COMPLETED' ORDER BY is_primary DESC, created_at DESC`),
   ]);
-  const nodes = nodesResult.results as unknown as HostedNode[];
+  const nodes = (nodesResult.results as unknown as HostedNode[]).map(normalizeNode);
   const edges = edgesResult.results as unknown as Array<{ id: string; parentNodeId: string; childNodeId: string; createdAt: string }>;
   const counts = countsResult.results as unknown as Array<{ nodeId: string; descriptionCount: number; imageCount: number }>;
   const reproductions = reproductionsResult.results as unknown as HostedReproduction[];
@@ -157,27 +176,33 @@ export async function listHostedNodes(filters: { query?: string; generation?: nu
     (SELECT COUNT(*) FROM generated_images i WHERE i.node_id=nodes.id AND i.status='COMPLETED') AS imageCount
     FROM nodes WHERE ${where} ORDER BY generation,name LIMIT 30 OFFSET ?`).bind(...values, (filters.page - 1) * 30));
   const total = await first<{ total: number }>(db().prepare(`SELECT COUNT(*) AS total FROM nodes WHERE ${where}`).bind(...values));
-  return { nodes: nodes.map(({ descriptionCount, imageCount, ...node }) => ({ ...node, _count: { descriptions: Number(descriptionCount), images: Number(imageCount) } })),
+  return { nodes: nodes.map(({ descriptionCount, imageCount, ...node }) => ({ ...normalizeNode(node), _count: { descriptions: Number(descriptionCount), images: Number(imageCount) } })),
     page: filters.page, pageSize: 30, total: Number(total?.total ?? 0) };
 }
 
 export async function getHostedNode(id: string) {
   await ensureHostedSchema();
-  const node = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(id));
+  const rawNode = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(id));
+  const node = rawNode ? normalizeNode(rawNode) : null;
   if (!node) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
   const [reproduction, childEdges, descriptions, rawImages] = await Promise.all([
     first<HostedReproduction>(db().prepare(`SELECT ${reproductionColumns} FROM reproductions WHERE child_node_id=?`).bind(id)),
     all<{ id: string; childNodeId: string }>(db().prepare("SELECT id,child_node_id AS childNodeId FROM parent_edges WHERE parent_node_id=? ORDER BY created_at").bind(id)),
-    all<{ id: string; nodeId: string; body: string; authorLabel: string | null; status: string; createdAt: string }>(db().prepare(
-      "SELECT id,node_id AS nodeId,body,author_label AS authorLabel,status,created_at AS createdAt FROM node_descriptions WHERE node_id=? AND status='VISIBLE' ORDER BY created_at DESC").bind(id)),
+    all<HostedDescription>(db().prepare(`SELECT d.id,d.node_id AS nodeId,d.body,d.author_label AS authorLabel,d.status,d.kind,d.created_at AS createdAt,
+      (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
+      (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
+      FROM node_descriptions d WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id)),
     all<HostedImage>(db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id)),
   ]);
-  const parents = reproduction ? await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (?,?)`).bind(reproduction.parentLowId, reproduction.parentHighId)) : [];
-  const children = childEdges.length ? await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (${childEdges.map(() => "?").join(",")})`).bind(...childEdges.map(({ childNodeId }) => childNodeId))) : [];
-  return { node, parents, children, reproduction, descriptions, images: rawImages.map(normalizeImage) };
+  const parents = reproduction ? (await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (?,?)`).bind(reproduction.parentLowId, reproduction.parentHighId))).map(normalizeNode) : [];
+  const children = childEdges.length ? (await all<HostedNode>(
+    db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (${childEdges.map(() => "?").join(",")})`)
+      .bind(...childEdges.map(({ childNodeId }) => childNodeId)),
+  )).map(normalizeNode) : [];
+  return { node, parents, children, reproduction, descriptions: descriptions.map((item) => ({ ...item, trueCount: Number(item.trueCount), falseCount: Number(item.falseCount) })), images: rawImages.map(normalizeImage) };
 }
 
-export async function createHostedGenesis(rawName: string) {
+export async function createHostedGenesis(rawName: string, suppliedDescription?: string) {
   await ensureHostedSchema();
   const world = await first<HostedWorld>(db().prepare(`SELECT ${worldColumns} FROM worlds WHERE id=?`).bind(WORLD_ID));
   if (!world) throw new ApiFailure("WORLD_NOT_FOUND", "The Eros world has not been initialized.", 404);
@@ -194,10 +219,14 @@ export async function createHostedGenesis(rawName: string) {
   const chromosomes = splitGenome(genomeHex); const createdAt = new Date().toISOString();
   const node: HostedNode = { id, worldId: WORLD_ID, protocolVersion: PROTOCOL_VERSION, promptVersion: IMAGE_PROMPT_VERSION,
     type: "GENESIS", name, nameKey, genomeHex, chromosome0Hex: chromosomes.chromosome0,
-    chromosome1Hex: chromosomes.chromosome1, generation: 0, createdAt };
-  await db().prepare(`INSERT INTO nodes (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, WORLD_ID, PROTOCOL_VERSION, IMAGE_PROMPT_VERSION, "GENESIS", name, nameKey, genomeHex,
-      node.chromosome0Hex, node.chromosome1Hex, 0, createdAt).run();
+    chromosome1Hex: chromosomes.chromosome1, generation: 0, isDead: false, recordsLocked: false, createdAt };
+  await db().batch([
+    db().prepare(`INSERT INTO nodes (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,is_dead,records_locked,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, WORLD_ID, PROTOCOL_VERSION, IMAGE_PROMPT_VERSION, "GENESIS", name, nameKey, genomeHex,
+        node.chromosome0Hex, node.chromosome1Hex, 0, 0, 0, createdAt),
+    db().prepare(`INSERT INTO node_descriptions (id,node_id,body,author_label,status,kind,created_at) VALUES (?,?,?,NULL,'VISIBLE','BIRTH',?)`)
+      .bind(newRecordId(), id, genesisBirthRecord(name, suppliedDescription), createdAt),
+  ]);
   return { node, created: true };
 }
 
@@ -206,12 +235,13 @@ export async function previewHostedReproduction(parentAId: string, parentBId: st
   if (parentAId === parentBId) throw new ApiFailure("PARENTS_MUST_BE_DIFFERENT", "Choose two different nodes.");
   const parents = await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id=? AND id IN (?,?)`).bind(WORLD_ID, parentAId, parentBId));
   if (parents.length !== 2) throw new ApiFailure("PARENT_NOT_FOUND", "Both nodes must already exist.", 404);
-  const parentA = parents.find(({ id }) => id === parentAId)!; const parentB = parents.find(({ id }) => id === parentBId)!;
+  const parentA = normalizeNode(parents.find(({ id }) => id === parentAId)!); const parentB = normalizeNode(parents.find(({ id }) => id === parentBId)!);
+  if (parentA.isDead || parentB.isDead) throw new ApiFailure("DEAD_PARENT", "死亡节点不能参与繁衍。", 409);
   const result = reproduce(parentA, parentB, name);
   return { result, mutationStats: calculateMutationStats(result.baseGenomeHex, result.childGenomeHex, result.flippedBitPositions) };
 }
 
-export async function createHostedDescendant(parentAId: string, parentBId: string, rawName: string) {
+export async function createHostedDescendant(parentAId: string, parentBId: string, rawName: string, suppliedDescription?: string) {
   const normalizedName = normalizeName(rawName); const nameKey = createNameKey(normalizedName);
   const preview = await previewHostedReproduction(parentAId, parentBId, normalizedName); const { result } = preview;
   const existing = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id=? AND name_key=?`).bind(WORLD_ID, nameKey));
@@ -229,11 +259,13 @@ export async function createHostedDescendant(parentAId: string, parentBId: strin
   const node: HostedNode = { id: result.childNodeId, worldId: WORLD_ID, protocolVersion: PROTOCOL_VERSION,
     promptVersion: IMAGE_PROMPT_VERSION, type: "DESCENDANT", name: normalizedName, nameKey,
     genomeHex: result.childGenomeHex, chromosome0Hex: chromosomes.chromosome0,
-    chromosome1Hex: chromosomes.chromosome1, generation, createdAt };
+    chromosome1Hex: chromosomes.chromosome1, generation, isDead: false, recordsLocked: false, createdAt };
+  const parentA = parentRecords.find((parent) => parent.id === parentAId)!;
+  const parentB = parentRecords.find((parent) => parent.id === parentBId)!;
   await db().batch([
-    db().prepare(`INSERT INTO nodes (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(node.id, WORLD_ID, PROTOCOL_VERSION, IMAGE_PROMPT_VERSION, node.type, node.name, nameKey,
-        node.genomeHex, node.chromosome0Hex, node.chromosome1Hex, generation, createdAt),
+    db().prepare(`INSERT INTO nodes (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,is_dead,records_locked,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(node.id, WORLD_ID, PROTOCOL_VERSION, IMAGE_PROMPT_VERSION, node.type, node.name, nameKey,
+        node.genomeHex, node.chromosome0Hex, node.chromosome1Hex, generation, 0, 0, createdAt),
     db().prepare(`INSERT INTO reproductions (id,child_node_id,parent_low_id,parent_high_id,low_choice,high_choice,low_selected_hex,low_unused_hex,
       high_selected_hex,high_unused_hex,base_genome_hex,hamming_distance,same_bit_count,similarity_ratio,similarity_mask_hex,
       requested_mutation_bits,mutation_bit_count,mutation_seed_hex,mutation_mask_hex,flipped_bit_positions_json,changed_token_positions_json,created_at)
@@ -244,26 +276,64 @@ export async function createHostedDescendant(parentAId: string, parentBId: strin
         result.mutationMaskHex, JSON.stringify(result.flippedBitPositions), JSON.stringify(preview.mutationStats.changedTokenPositions), createdAt),
     db().prepare("INSERT INTO parent_edges (id,parent_node_id,child_node_id,created_at) VALUES (?,?,?,?)").bind(newRecordId(), result.parentLowId, node.id, createdAt),
     db().prepare("INSERT INTO parent_edges (id,parent_node_id,child_node_id,created_at) VALUES (?,?,?,?)").bind(newRecordId(), result.parentHighId, node.id, createdAt),
+    db().prepare(`INSERT INTO node_descriptions (id,node_id,body,author_label,status,kind,created_at) VALUES (?,?,?,NULL,'VISIBLE','BIRTH',?)`)
+      .bind(newRecordId(), node.id, descendantBirthRecord(node.name, parentA.name, parentB.name, suppliedDescription), createdAt),
   ]);
   return { node, ...preview, created: true };
 }
 
 export async function addHostedDescription(nodeId: string, body: string, authorLabel?: string) {
   await ensureHostedSchema();
-  if (!await first(db().prepare("SELECT id FROM nodes WHERE id=?").bind(nodeId))) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
+  const node = await first<{ id: string; recordsLocked: number }>(db().prepare("SELECT id,records_locked AS recordsLocked FROM nodes WHERE id=?").bind(nodeId));
+  if (!node) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
+  if (node.recordsLocked) throw new ApiFailure("NODE_RECORDS_LOCKED", "该节点的记述已永久封存。", 409);
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const recent = await all<{ body: string }>(db().prepare("SELECT body FROM node_descriptions WHERE node_id=? AND created_at>=?").bind(nodeId, since));
   if (recent.some((item) => item.body.normalize("NFKC").toLowerCase() === body.toLowerCase()))
     throw new ApiFailure("DUPLICATE_DESCRIPTION", "This description was already added recently.", 409);
-  const description = { id: newRecordId(), nodeId, body, authorLabel: authorLabel || null, status: "VISIBLE", createdAt: new Date().toISOString() };
-  await db().prepare("INSERT INTO node_descriptions (id,node_id,body,author_label,status,created_at) VALUES (?,?,?,?,?,?)")
-    .bind(description.id, nodeId, body, description.authorLabel, description.status, description.createdAt).run();
+  const description = { id: newRecordId(), nodeId, body, authorLabel: authorLabel || null, status: "VISIBLE", kind: "STORY" as const, createdAt: new Date().toISOString(), trueCount: 0, falseCount: 0 };
+  await db().prepare("INSERT INTO node_descriptions (id,node_id,body,author_label,status,kind,created_at) VALUES (?,?,?,?,?,?,?)")
+    .bind(description.id, nodeId, body, description.authorLabel, description.status, description.kind, description.createdAt).run();
   return description;
+}
+
+export async function setHostedNodeLifeStatus(nodeId: string, action: "die" | "revive", body: string) {
+  await ensureHostedSchema();
+  const rawNode = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(nodeId));
+  if (!rawNode) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
+  const node = normalizeNode(rawNode);
+  if (node.recordsLocked) throw new ApiFailure("NODE_RECORDS_LOCKED", "该节点已永久封存，不能改变生死状态。", 409);
+  const nextDead = action === "die";
+  if (node.isDead === nextDead) throw new ApiFailure("LIFE_STATUS_UNCHANGED", nextDead ? "该节点已经死亡。" : "该节点已经复活。", 409);
+  const createdAt = new Date().toISOString();
+  const description = { id: newRecordId(), nodeId, body, authorLabel: null, status: "VISIBLE", kind: (nextDead ? "DEATH" : "REVIVAL") as DescriptionKind, createdAt, trueCount: 0, falseCount: 0 };
+  await db().batch([
+    db().prepare("UPDATE nodes SET is_dead=? WHERE id=?").bind(nextDead ? 1 : 0, nodeId),
+    db().prepare("INSERT INTO node_descriptions (id,node_id,body,author_label,status,kind,created_at) VALUES (?,?,?,?,?,?,?)")
+      .bind(description.id, nodeId, body, null, description.status, description.kind, createdAt),
+  ]);
+  return { node: { ...node, isDead: nextDead }, description };
+}
+
+export async function setHostedDescriptionFeedback(descriptionId: string, voterKey: string, isTrue: boolean) {
+  await ensureHostedSchema();
+  if (!await first(db().prepare("SELECT id FROM node_descriptions WHERE id=? AND status='VISIBLE'").bind(descriptionId)))
+    throw new ApiFailure("DESCRIPTION_NOT_FOUND", "记述不存在。", 404);
+  const now = new Date().toISOString();
+  await db().prepare(`INSERT INTO description_feedback (id,description_id,voter_key,is_true,created_at,updated_at)
+    VALUES (?,?,?,?,?,?) ON CONFLICT(description_id,voter_key) DO UPDATE SET is_true=excluded.is_true,updated_at=excluded.updated_at`)
+    .bind(newRecordId(), descriptionId, voterKey, isTrue ? 1 : 0, now, now).run();
+  const counts = await first<{ trueCount: number; falseCount: number }>(db().prepare(`SELECT
+    SUM(CASE WHEN is_true=1 THEN 1 ELSE 0 END) AS trueCount,
+    SUM(CASE WHEN is_true=0 THEN 1 ELSE 0 END) AS falseCount
+    FROM description_feedback WHERE description_id=?`).bind(descriptionId));
+  return { descriptionId, isTrue, trueCount: Number(counts?.trueCount ?? 0), falseCount: Number(counts?.falseCount ?? 0) };
 }
 
 export async function getHostedNodeForImage(nodeId: string) {
   await ensureHostedSchema();
-  return first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(nodeId));
+  const node = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(nodeId));
+  return node ? normalizeNode(node) : null;
 }
 export async function countHostedCompletedImages(nodeId: string) {
   const row = await first<{ total: number }>(db().prepare("SELECT COUNT(*) AS total FROM generated_images WHERE node_id=? AND status='COMPLETED'").bind(nodeId));

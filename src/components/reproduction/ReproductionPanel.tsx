@@ -25,6 +25,8 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
   const [mode, setMode] = useState<"descendant" | "genesis">("descendant");
   const [name, setName] = useState("");
   const [genesisName, setGenesisName] = useState("");
+  const [birthDescription, setBirthDescription] = useState("");
+  const [genesisDescription, setGenesisDescription] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +49,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
     event.preventDefault(); setBusy(true); setError("");
     try {
       const response = await fetch("/api/reproduce", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ parentAId: parentIds[0], parentBId: parentIds[1], name }) });
+        body: JSON.stringify({ parentAId: parentIds[0], parentBId: parentIds[1], name, description: birthDescription }) });
       const body = await response.json() as { node: { id: string }; result: Preview["result"]; mutationStats: Preview["mutationStats"]; error?: { message?: string } };
       if (!response.ok) throw new Error(body.error?.message ?? "创建失败");
       setResult({ result: body.result, mutationStats: body.mutationStats });
@@ -60,10 +62,11 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
     event.preventDefault(); setBusy(true); setError("");
     try {
       const response = await fetch("/api/nodes/genesis", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: genesisName }) });
+        body: JSON.stringify({ name: genesisName, description: genesisDescription }) });
       const body = await response.json() as { node: { id: string }; error?: { message?: string } };
       if (!response.ok) throw new Error(body.error?.message ?? "创世节点创建失败");
       setGenesisName("");
+      setGenesisDescription("");
       onCreated(body.node.id);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "创世节点创建失败"); }
     finally { setBusy(false); }
@@ -72,6 +75,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
   const short = (id: string) => nodes.find((node) => node.id === id)?.genomeHex.slice(0, 10) ?? "—";
   const nodeName = (id: string) => nodes.find((node) => node.id === id)?.name ?? `${id.slice(0, 6)}…`;
   const shown = result ?? preview;
+  const liveNodes = nodes.filter((node) => !node.isDead);
   return <aside className={`${mobileOpen ? "flex" : "hidden"} glass fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] top-16 z-30 min-h-0 flex-col overflow-hidden rounded-3xl shadow-2xl md:static md:flex md:max-h-[calc(100vh-5rem)] md:w-[390px] md:shrink-0 md:shadow-none`}>
     <div className="border-b border-white/10 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[.2em] text-fuchsia-300 sm:tracking-[.24em]">{mode === "descendant" ? "Create a descendant" : "Create a genesis root"}</p><h2 className="mt-1 text-xl font-semibold">{mode === "descendant" ? "繁衍新节点" : "创建创世节点"}</h2></div>{onMobileClose && <button type="button" onClick={onMobileClose} aria-label="关闭创建面板" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 text-xl md:hidden">×</button>}</div>
       <div className="mt-4 grid grid-cols-2 rounded-xl bg-black/25 p-1 text-sm"><button type="button" onClick={() => { setMode("descendant"); setError(""); }} className={`rounded-lg px-3 py-2 ${mode === "descendant" ? "bg-white/10 text-white" : "text-slate-500"}`}>繁衍</button><button type="button" onClick={() => { setMode("genesis"); setError(""); }} className={`rounded-lg px-3 py-2 ${mode === "genesis" ? "bg-white/10 text-cyan-200" : "text-slate-500"}`}>创世</button></div>
@@ -82,23 +86,29 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
         <label className="block text-sm text-slate-300">创世节点名称
           <input aria-label="创世节点名称" value={genesisName} onChange={(event) => setGenesisName(event.target.value)} maxLength={128} required placeholder="输入不可修改的名称" className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 p-3 outline-none focus:border-cyan-400" />
         </label>
+        <label className="block text-sm text-slate-300">诞生记述 <span className="text-xs text-slate-600">· 可留空</span>
+          <textarea aria-label="创世诞生记述" value={genesisDescription} onChange={(event) => setGenesisDescription(event.target.value)} maxLength={500} placeholder={genesisName.trim() ? `${genesisName.trim()}诞生于虚无中...` : "留空时自动生成：A诞生于虚无中..."} className="mt-1 h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm outline-none focus:border-cyan-400" />
+        </label>
         {error && <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
         <button disabled={busy || !genesisName.trim()} className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-white disabled:opacity-40">{busy ? "正在创建…" : "创建创世节点"}</button>
       </form> : <>
       <form onSubmit={submit} className="space-y-4">
         <label className="block text-sm text-slate-300">节点 A
           <select aria-label="节点 A" value={parentIds[0]} onChange={(event) => setParentIds([event.target.value, parentIds[1]])} required className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 p-3">
-            <option value="">选择节点</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name} · {node.genomeHex.slice(0, 8)}</option>)}
+            <option value="">选择存活节点</option>{liveNodes.map((node) => <option key={node.id} value={node.id}>{node.name} · {node.genomeHex.slice(0, 8)}</option>)}
           </select>
         </label>
         <button type="button" onClick={() => setParentIds([parentIds[1], parentIds[0]])} className="w-full text-xs text-slate-400 hover:text-white">⇅ 交换视觉选择顺序（结果不变）</button>
         <label className="block text-sm text-slate-300">节点 B
           <select aria-label="节点 B" value={parentIds[1]} onChange={(event) => setParentIds([parentIds[0], event.target.value])} required className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 p-3">
-            <option value="">选择节点</option>{nodes.map((node) => <option key={node.id} value={node.id}>{node.name} · {node.genomeHex.slice(0, 8)}</option>)}
+            <option value="">选择存活节点</option>{liveNodes.map((node) => <option key={node.id} value={node.id}>{node.name} · {node.genomeHex.slice(0, 8)}</option>)}
           </select>
         </label>
         <label className="block text-sm text-slate-300">新节点名称
           <input aria-label="新节点名称" value={name} onChange={(event) => { setName(event.target.value); setResult(null); }} maxLength={128} required placeholder="输入不可修改的名称" className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 p-3 outline-none focus:border-cyan-400" />
+        </label>
+        <label className="block text-sm text-slate-300">诞生记述 <span className="text-xs text-slate-600">· 可留空</span>
+          <textarea aria-label="繁衍诞生记述" value={birthDescription} onChange={(event) => setBirthDescription(event.target.value)} maxLength={500} placeholder={name.trim() && parentIds[0] && parentIds[1] ? `${name.trim()}诞生于${nodeName(parentIds[0])}与${nodeName(parentIds[1])}的结合...` : "留空时自动记录 C 诞生于 A 与 B 的结合"} className="mt-1 h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm outline-none focus:border-fuchsia-400" />
         </label>
         {parentIds[0] && parentIds[1] && <div className="grid grid-cols-2 gap-2 text-xs text-slate-500"><span className="hash">A {short(parentIds[0])}</span><span className="hash">B {short(parentIds[1])}</span></div>}
         {preview && <div data-testid="similarity-preview" className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm">

@@ -17,7 +17,7 @@ test("initialize, reproduce, inspect protocol text, and annotate", async ({ page
   await page.getByRole("button", { name: "繁衍", exact: true }).click();
   const graph = await page.request.get("/api/graph").then((response) => response.json());
   await page.getByLabel("节点 A").selectOption(graph.nodes.find((node: { name: string }) => node.name === "Gaia").id);
-  await page.getByLabel("节点 B").selectOption(graph.nodes.find((node: { name: string }) => node.name === "Eros").id);
+  await page.getByLabel("节点 B").selectOption(graph.nodes.find((node: { name: string }) => node.name === "Psyche").id);
   const name = `Astra-${Date.now()}`;
   await page.getByLabel("新节点名称").fill(name);
   await expect(page.getByTestId("similarity-preview")).toBeVisible();

@@ -7,6 +7,7 @@ import { reproduce } from "./protocol/reproduction";
 import { calculateMutationStats } from "./protocol/token-decoder";
 import { ApiFailure } from "./api";
 import { newRecordId, WORLD_ID } from "./world";
+import { descendantBirthRecord } from "./story";
 
 export async function previewReproduction(parentAId: string, parentBId: string, name: string) {
   if (parentAId === parentBId) throw new ApiFailure("PARENTS_MUST_BE_DIFFERENT", "Choose two different nodes.");
@@ -14,11 +15,12 @@ export async function previewReproduction(parentAId: string, parentBId: string, 
   if (parents.length !== 2) throw new ApiFailure("PARENT_NOT_FOUND", "Both nodes must already exist.", 404);
   const parentA = parents.find(({ id }) => id === parentAId)!;
   const parentB = parents.find(({ id }) => id === parentBId)!;
+  if (parentA.isDead || parentB.isDead) throw new ApiFailure("DEAD_PARENT", "死亡节点不能参与繁衍。", 409);
   const result = reproduce(parentA, parentB, name);
   return { result, mutationStats: calculateMutationStats(result.baseGenomeHex, result.childGenomeHex, result.flippedBitPositions) };
 }
 
-export async function createDescendant(parentAId: string, parentBId: string, rawName: string) {
+export async function createDescendant(parentAId: string, parentBId: string, rawName: string, suppliedDescription?: string) {
   const normalizedName = normalizeName(rawName);
   const nameKey = createNameKey(normalizedName);
   const preview = await previewReproduction(parentAId, parentBId, normalizedName);
@@ -40,11 +42,14 @@ export async function createDescendant(parentAId: string, parentBId: string, raw
     const node = await prisma.$transaction(async (tx) => {
       const parentRecords = await tx.node.findMany({ where: { id: { in: [result.parentLowId, result.parentHighId] } } });
       const generation = Math.max(...parentRecords.map((parent) => parent.generation)) + 1;
+      const parentA = parentRecords.find((parent) => parent.id === parentAId)!;
+      const parentB = parentRecords.find((parent) => parent.id === parentBId)!;
       const created = await tx.node.create({ data: {
         id: result.childNodeId, worldId: WORLD_ID, protocolVersion: PROTOCOL_VERSION,
         promptVersion: IMAGE_PROMPT_VERSION, type: "DESCENDANT", name: normalizedName, nameKey,
         genomeHex: result.childGenomeHex, chromosome0Hex: chromosomes.chromosome0,
         chromosome1Hex: chromosomes.chromosome1, generation,
+        descriptions: { create: { id: newRecordId(), body: descendantBirthRecord(normalizedName, parentA.name, parentB.name, suppliedDescription), kind: "BIRTH" } },
       } });
       await tx.reproduction.create({ data: {
         id: newRecordId(), childNodeId: created.id, parentLowId: result.parentLowId, parentHighId: result.parentHighId,

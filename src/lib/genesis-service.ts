@@ -7,9 +7,10 @@ import { createGenesisGenome, createNodeId } from "./protocol/genesis";
 import { bytesToHex } from "./protocol/hex";
 import { createNameKey, normalizeName } from "./protocol/normalization";
 import { WORLD_ID } from "./world";
+import { genesisBirthRecord } from "./story";
 
 /** Create an additional generation-0 root using the world's permanent genesis timestamp. */
-export async function createAdditionalGenesis(rawName: string) {
+export async function createAdditionalGenesis(rawName: string, suppliedDescription?: string) {
   const world = await prisma.world.findUnique({ where: { id: WORLD_ID } });
   if (!world) throw new ApiFailure("WORLD_NOT_FOUND", "The Eros world has not been initialized.", 404);
 
@@ -49,6 +50,7 @@ export async function createAdditionalGenesis(rawName: string) {
       chromosome0Hex: chromosomes.chromosome0,
       chromosome1Hex: chromosomes.chromosome1,
       generation: 0,
+      descriptions: { create: { id: crypto.randomUUID(), body: genesisBirthRecord(name, suppliedDescription), kind: "BIRTH" } },
     } });
     return { node, created: true };
   } catch (error) {

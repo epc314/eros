@@ -5,6 +5,8 @@ export interface GraphNodeRecord {
   promptVersion: string;
   type: "GENESIS" | "DESCENDANT";
   generation: number;
+  isDead: boolean;
+  recordsLocked: boolean;
   _count: { descriptions: number; images: number };
   images: Array<{ imageDataUrl?: string | null; imageUrl?: string | null; thumbnailUrl?: string | null }>;
   reproduction?: { mutationBitCount: number } | null;

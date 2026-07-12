@@ -18,6 +18,13 @@ enum DescriptionStatus {
   FLAGGED
 }
 
+enum DescriptionKind {
+  BIRTH
+  STORY
+  DEATH
+  REVIVAL
+}
+
 enum ImageStatus {
   PENDING
   COMPLETED
@@ -25,112 +32,129 @@ enum ImageStatus {
 }
 
 model World {
-  id                     String   @id
-  name                   String
-  protocolVersion        String
-  genesisTimestampMs     String
-  initializedAt          DateTime @default(now())
-  nodes                  Node[]
+  id                 String   @id
+  name               String
+  protocolVersion    String
+  genesisTimestampMs String
+  initializedAt      DateTime @default(now())
+  nodes              Node[]
 }
 
 model Node {
-  id                  String    @id
-  worldId             String
-  protocolVersion     String
-  promptVersion       String
-  type                NodeType
-  name                String
-  nameKey             String
-  genomeHex           String    @unique
-  chromosome0Hex      String
-  chromosome1Hex      String
-  generation          Int
-  createdAt           DateTime  @default(now())
-  world               World     @relation(fields: [worldId], references: [id], onDelete: Restrict)
-  reproduction        Reproduction? @relation("ChildReproduction")
-  lowReproductions    Reproduction[] @relation("LowReproductions")
-  highReproductions   Reproduction[] @relation("HighReproductions")
-  parentEdges         ParentEdge[] @relation("ChildEdges")
-  childEdges          ParentEdge[] @relation("ParentEdges")
-  descriptions        NodeDescription[]
-  images              GeneratedImage[]
+  id                String            @id
+  worldId           String
+  protocolVersion   String
+  promptVersion     String
+  type              NodeType
+  name              String
+  nameKey           String
+  genomeHex         String            @unique
+  chromosome0Hex    String
+  chromosome1Hex    String
+  generation        Int
+  isDead            Boolean           @default(false)
+  recordsLocked     Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  world             World             @relation(fields: [worldId], references: [id], onDelete: Restrict)
+  reproduction      Reproduction?     @relation("ChildReproduction")
+  lowReproductions  Reproduction[]    @relation("LowReproductions")
+  highReproductions Reproduction[]    @relation("HighReproductions")
+  parentEdges       ParentEdge[]      @relation("ChildEdges")
+  childEdges        ParentEdge[]      @relation("ParentEdges")
+  descriptions      NodeDescription[]
+  images            GeneratedImage[]
 
   @@unique([worldId, nameKey])
   @@index([worldId, generation])
 }
 
 model Reproduction {
-  id                         String   @id
-  childNodeId                String   @unique
-  parentLowId                String
-  parentHighId               String
-  lowChoice                  Int
-  highChoice                 Int
-  lowSelectedHex             String
-  lowUnusedHex               String
-  highSelectedHex            String
-  highUnusedHex              String
-  baseGenomeHex              String
-  hammingDistance            Int
-  sameBitCount               Int
-  similarityRatio            Float
-  similarityMaskHex          String
-  requestedMutationBits      Int
-  mutationBitCount           Int
-  mutationSeedHex            String
-  mutationMaskHex            String
-  flippedBitPositionsJson    String
-  changedTokenPositionsJson  String
-  createdAt                  DateTime @default(now())
-  child                      Node @relation("ChildReproduction", fields: [childNodeId], references: [id], onDelete: Restrict)
-  parentLow                  Node @relation("LowReproductions", fields: [parentLowId], references: [id], onDelete: Restrict)
-  parentHigh                 Node @relation("HighReproductions", fields: [parentHighId], references: [id], onDelete: Restrict)
+  id                        String   @id
+  childNodeId               String   @unique
+  parentLowId               String
+  parentHighId              String
+  lowChoice                 Int
+  highChoice                Int
+  lowSelectedHex            String
+  lowUnusedHex              String
+  highSelectedHex           String
+  highUnusedHex             String
+  baseGenomeHex             String
+  hammingDistance           Int
+  sameBitCount              Int
+  similarityRatio           Float
+  similarityMaskHex         String
+  requestedMutationBits     Int
+  mutationBitCount          Int
+  mutationSeedHex           String
+  mutationMaskHex           String
+  flippedBitPositionsJson   String
+  changedTokenPositionsJson String
+  createdAt                 DateTime @default(now())
+  child                     Node     @relation("ChildReproduction", fields: [childNodeId], references: [id], onDelete: Restrict)
+  parentLow                 Node     @relation("LowReproductions", fields: [parentLowId], references: [id], onDelete: Restrict)
+  parentHigh                Node     @relation("HighReproductions", fields: [parentHighId], references: [id], onDelete: Restrict)
 }
 
 model ParentEdge {
-  id            String   @id
-  parentNodeId  String
-  childNodeId   String
-  createdAt     DateTime @default(now())
-  parent        Node @relation("ParentEdges", fields: [parentNodeId], references: [id], onDelete: Restrict)
-  child         Node @relation("ChildEdges", fields: [childNodeId], references: [id], onDelete: Restrict)
+  id           String   @id
+  parentNodeId String
+  childNodeId  String
+  createdAt    DateTime @default(now())
+  parent       Node     @relation("ParentEdges", fields: [parentNodeId], references: [id], onDelete: Restrict)
+  child        Node     @relation("ChildEdges", fields: [childNodeId], references: [id], onDelete: Restrict)
 
   @@unique([parentNodeId, childNodeId])
   @@index([childNodeId])
 }
 
 model NodeDescription {
-  id          String            @id
+  id          String                @id
   nodeId      String
   body        String
   authorLabel String?
-  status      DescriptionStatus @default(VISIBLE)
-  createdAt   DateTime          @default(now())
-  node        Node @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  status      DescriptionStatus     @default(VISIBLE)
+  kind        DescriptionKind       @default(STORY)
+  createdAt   DateTime              @default(now())
+  node        Node                  @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  feedback    DescriptionFeedback[]
 
   @@index([nodeId, createdAt])
 }
 
+model DescriptionFeedback {
+  id            String          @id
+  descriptionId String
+  voterKey      String
+  isTrue        Boolean
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  description   NodeDescription @relation(fields: [descriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([descriptionId, voterKey])
+  @@index([descriptionId])
+}
+
 model GeneratedImage {
-  id                  String      @id
-  nodeId              String
-  provider            String
-  providerModel       String?
-  providerRequestId   String?
-  exactPrompt         String
-  promptVersion       String
-  providerSeed        String?
-  variationId         String?
-  imageUrl            String?
-  localPath           String?
-  imageDataUrl        String?
-  width               Int?
-  height              Int?
-  isPrimary           Boolean     @default(false)
-  status              ImageStatus @default(PENDING)
-  errorMessage        String?
-  createdAt           DateTime    @default(now())
-  node                Node @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  id                String      @id
+  nodeId            String
+  provider          String
+  providerModel     String?
+  providerRequestId String?
+  exactPrompt       String
+  promptVersion     String
+  providerSeed      String?
+  variationId       String?
+  imageUrl          String?
+  localPath         String?
+  imageDataUrl      String?
+  width             Int?
+  height            Int?
+  isPrimary         Boolean     @default(false)
+  status            ImageStatus @default(PENDING)
+  errorMessage      String?
+  createdAt         DateTime    @default(now())
+  node              Node        @relation(fields: [nodeId], references: [id], onDelete: Restrict)
 
   @@index([nodeId, createdAt])
 }

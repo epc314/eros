@@ -8,6 +8,7 @@ export interface ErosNodeData extends Record<string, unknown> {
   genomeHex: string;
   type: "GENESIS" | "DESCENDANT";
   generation: number;
+  isDead: boolean;
   descriptionCount: number;
   imageCount: number;
   image?: string;
@@ -22,11 +23,12 @@ export interface ErosNodeData extends Record<string, unknown> {
 export function GraphNodeCard({ data, selected }: NodeProps) {
   const item = data as ErosNodeData;
   const tokenHex = item.genomeHex.match(/.{4}/g)?.slice(0, 8) ?? [];
-  return <article className={`w-[220px] overflow-hidden rounded-2xl border bg-[#111827] shadow-2xl transition ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
+  return <article className={`w-[220px] overflow-hidden rounded-2xl border shadow-2xl transition ${item.isDead ? "border-slate-500/30 bg-[#20242c] grayscale" : "bg-[#111827]"} ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
     <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-cyan-400" />
     <div className="relative h-32 overflow-hidden bg-slate-950">
       {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={384} height={224} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-contain" /> : <div className="grid h-full place-items-center bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]"><div className="hash grid grid-cols-4 gap-1 text-center text-[8px] text-cyan-200/60">{tokenHex.slice(0, 4).map((token, index) => <span key={index} className="rounded bg-cyan-300/5 px-1 py-1">{token}</span>)}</div></div>}
       <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-[10px] uppercase tracking-widest text-cyan-200">{item.type === "GENESIS" ? "Root · 创世" : `Gen ${item.generation}`}</span>
+      {item.isDead && <span className="absolute bottom-2 right-2 rounded-full border border-white/20 bg-slate-950/85 px-2 py-1 text-[10px] text-slate-200">已死亡</span>}
       {item.selectedAs && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-fuchsia-500 text-xs font-bold">{item.selectedAs}</span>}
     </div>
     <div className="space-y-2 p-3">

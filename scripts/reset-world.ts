@@ -8,6 +8,7 @@ async function main() {
   const preservedTimestamp = existing?.genesisTimestampMs;
 
   await prisma.$transaction(async (tx) => {
+    await tx.descriptionFeedback.deleteMany();
     await tx.generatedImage.deleteMany();
     await tx.nodeDescription.deleteMany();
     await tx.parentEdge.deleteMany();
