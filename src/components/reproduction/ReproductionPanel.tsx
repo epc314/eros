@@ -51,7 +51,6 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
   const [birthDescription, setBirthDescription] = useState("");
   const [genesisDescription, setGenesisDescription] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
-  const [result, setResult] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -68,6 +67,15 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [parentIds, name]);
 
+  function resetDescendantForm() {
+    setParentIds(["", ""]); setName(""); setBirthDescription("");
+    setPreview(null); setError("");
+  }
+
+  function resetGenesisForm() {
+    setGenesisName(""); setGenesisDescription(""); setError("");
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
@@ -75,7 +83,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
         body: JSON.stringify({ parentAId: parentIds[0], parentBId: parentIds[1], name, description: birthDescription }) });
       const body = await response.json() as { node: { id: string }; result: Preview["result"]; mutationStats: Preview["mutationStats"]; error?: { message?: string } };
       if (!response.ok) throw new Error(body.error?.message ?? "创建失败");
-      setResult({ result: body.result, mutationStats: body.mutationStats });
+      resetDescendantForm();
       onCreated(body.node.id);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "创建失败"); }
     finally { setBusy(false); }
@@ -88,8 +96,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
         body: JSON.stringify({ name: genesisName, description: genesisDescription }) });
       const body = await response.json() as { node: { id: string }; error?: { message?: string } };
       if (!response.ok) throw new Error(body.error?.message ?? "创世存在创建失败");
-      setGenesisName("");
-      setGenesisDescription("");
+      resetGenesisForm();
       onCreated(body.node.id);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "创世存在创建失败"); }
     finally { setBusy(false); }
@@ -97,7 +104,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
 
   const short = (id: string) => nodes.find((node) => node.id === id)?.genomeHex.slice(0, 10) ?? "—";
   const nodeName = (id: string) => nodes.find((node) => node.id === id)?.name ?? `${id.slice(0, 6)}…`;
-  const shown = result ?? preview;
+  const shown = preview;
   const liveNodes = nodes.filter((node) => !node.isDead);
   return <aside className={`${mobileOpen ? "flex" : "hidden"} glass fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] top-16 z-30 min-h-0 flex-col overflow-hidden rounded-3xl shadow-2xl md:static md:flex md:max-h-[calc(100vh-5rem)] md:w-[390px] md:shrink-0 md:shadow-none`}>
     <div className="border-b border-white/10 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[.2em] text-fuchsia-300 sm:tracking-[.24em]">{mode === "descendant" ? "Create a descendant" : "Create a genesis root"}</p><h2 className="mt-1 text-xl font-semibold">{mode === "descendant" ? "繁衍新存在" : "创建创世存在"}</h2></div>{onMobileClose && <button type="button" onClick={onMobileClose} aria-label="关闭创建面板" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 text-xl md:hidden">×</button>}</div>
@@ -120,7 +127,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
         <button type="button" onClick={() => setParentIds([parentIds[1], parentIds[0]])} className="w-full text-xs text-slate-400 hover:text-white">⇅ 交换视觉选择顺序（结果不变）</button>
         <ParentPicker slot="B" nodes={liveNodes} value={parentIds[1]} excludeId={parentIds[0]} onChange={(id) => setParentIds([parentIds[0], id])} />
         <label className="block text-sm text-slate-300">新存在名称
-          <input aria-label="新存在名称" value={name} onChange={(event) => { setName(event.target.value); setResult(null); }} maxLength={128} required placeholder="输入不可修改的名称" className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 p-3 outline-none focus:border-cyan-400" />
+          <input aria-label="新存在名称" value={name} onChange={(event) => setName(event.target.value)} maxLength={128} required placeholder="输入不可修改的名称" className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 p-3 outline-none focus:border-cyan-400" />
         </label>
         <label className="block text-sm text-slate-300">诞生记述 <span className="text-xs text-slate-600">· 可留空</span>
           <textarea aria-label="繁衍诞生记述" value={birthDescription} onChange={(event) => setBirthDescription(event.target.value)} maxLength={500} placeholder="留空时自动记录" className="mt-1 h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm outline-none focus:border-fuchsia-400" />
@@ -135,7 +142,7 @@ export function ReproductionPanel({ nodes, parentIds, setParentIds, onCreated, m
         <button disabled={busy || !preview} className="w-full rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-500 px-4 py-3 font-semibold text-white disabled:opacity-40">{busy ? "正在创建…" : "创建不可变存在"}</button>
       </form>
       {shown && <section className="mt-6 space-y-3 border-t border-white/10 pt-5 text-xs">
-        <h3 className="text-base font-semibold">{result ? "繁衍结果" : "确定性预览"}</h3>
+        <h3 className="text-base font-semibold">确定性预览</h3>
         <dl className="grid grid-cols-2 gap-2 text-slate-400"><dt>规范化亲本</dt><dd className="text-right">{shown.result.parentLowId.slice(0, 6)}… / {shown.result.parentHighId.slice(0, 6)}…</dd><dt>Chromosome 0 来源</dt><dd className="text-right text-cyan-300">{nodeName(shown.result.chromosome0ParentId)} · C0</dd><dt>Chromosome 1 来源</dt><dd className="text-right text-fuchsia-300">{nodeName(shown.result.chromosome1ParentId)} · C1</dd><dt>亲本选择编号</dt><dd className="text-right">{shown.result.lowChoice} / {shown.result.highChoice}</dd><dt>相同 bit</dt><dd className="text-right">{shown.result.similarity.sameBitCount}</dd><dt>Hamming 距离</dt><dd className="text-right">{shown.result.similarity.hammingDistance}</dd><dt>突变预算</dt><dd className="text-right">{shown.result.requestedMutationBits} / {shown.result.mutationBitCount}</dd><dt>改变 Token</dt><dd className="text-right">{shown.mutationStats.changedTokenCount}</dd></dl>
         <details><summary className="cursor-pointer text-cyan-300">查看完整遗传计算</summary><div className="mt-3 space-y-3 text-slate-400"><p>基础基因组</p><p className="hash">{shown.result.baseGenomeHex}</p><p>翻转位置</p><p className="hash">{shown.result.flippedBitPositions.join(", ")}</p><p>突变掩码</p><p className="hash">{shown.result.mutationMaskHex}</p><p>最终 Hash</p><p className="hash text-white">{shown.result.childGenomeHex}</p>{shown.mutationStats.beforeAfterTokens.map((change) => <p key={change.position}>Token {change.position}: {change.beforeTokenId} → {change.afterTokenId}</p>)}</div></details>
       </section>}
