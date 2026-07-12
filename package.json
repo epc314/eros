@@ -1,0 +1,63 @@
+{
+  "name": "eros",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "dev:full": "concurrently --kill-others --names flux,web \"npm:flux:serve\" \"npm:dev\"",
+    "flux:setup": "uv sync --project services/flux2",
+    "flux:serve": "PYTORCH_ENABLE_MPS_FALLBACK=1 services/flux2/.venv/bin/python services/flux2/server.py",
+    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "DATABASE_URL=file:./test.db tsx scripts/ensure-sqlite.ts && DATABASE_URL=file:./test.db prisma migrate reset --force --skip-seed && DATABASE_URL=file:./test.db vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:generate": "prisma generate",
+    "db:migrate": "tsx scripts/ensure-sqlite.ts && prisma migrate dev",
+    "db:reset-world": "tsx scripts/reset-world.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "images:backfill": "tsx scripts/backfill-images.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.2.0",
+    "@prisma/client": "6.19.3",
+    "@xyflow/react": "^12.4.4",
+    "dotenv": "^17.4.2",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.51.1",
+    "@testing-library/react": "^16.2.0",
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "5.20260712.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.22.0",
+    "eslint-config-next": "16.2.6",
+    "jsdom": "^26.0.0",
+    "postcss": "8.5.17",
+    "prisma": "6.19.3",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.3",
+    "typescript": "5.9.3",
+    "vinext": "0.0.50",
+    "vite": "8.0.13",
+    "vitest": "4.1.10",
+    "wrangler": "4.92.0"
+  },
+  "overrides": {
+    "postcss": "8.5.17"
+  },
+  "type": "module"
+}
