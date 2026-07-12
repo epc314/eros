@@ -2,9 +2,11 @@
 /* eslint-disable @next/next/no-img-element -- graph cards use pre-generated R2 thumbnails */
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { prefetchExistenceDetail } from "../node/NodeDetailPanel";
 
 export interface ErosNodeData extends Record<string, unknown> {
   name: string;
+  id: string;
   genomeHex: string;
   type: "GENESIS" | "DESCENDANT";
   generation: number;
@@ -22,7 +24,7 @@ export interface ErosNodeData extends Record<string, unknown> {
 
 export function GraphNodeCard({ data, selected }: NodeProps) {
   const item = data as ErosNodeData;
-  return <article aria-label={`${item.name} · ${item.primaryEntityZh}`} className={`w-[268px] overflow-hidden rounded-2xl border shadow-2xl transition ${item.isDead ? "border-slate-500/30 bg-[#20242c] grayscale" : "bg-[#111827]"} ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
+  return <article aria-label={`${item.name} · ${item.primaryEntityZh}`} onPointerEnter={() => prefetchExistenceDetail(item.id)} onPointerDown={() => prefetchExistenceDetail(item.id)} className={`w-[268px] overflow-hidden rounded-2xl border shadow-2xl transition ${item.isDead ? "border-slate-500/30 bg-[#20242c] grayscale" : "bg-[#111827]"} ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
     <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-cyan-400" />
     <div className="relative h-[188px] overflow-hidden bg-slate-950">
       {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={512} height={320} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-contain" /> : <div className="h-full bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]" />}

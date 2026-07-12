@@ -189,15 +189,19 @@ export async function getHostedNode(id: string) {
   const rawNode = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(id));
   const node = rawNode ? normalizeNode(rawNode) : null;
   if (!node) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
-  const [reproduction, childEdges, descriptions, rawImages] = await Promise.all([
-    first<HostedReproduction>(db().prepare(`SELECT ${reproductionColumns} FROM reproductions WHERE child_node_id=?`).bind(id)),
-    all<{ id: string; childNodeId: string }>(db().prepare("SELECT id,child_node_id AS childNodeId FROM parent_edges WHERE parent_node_id=? ORDER BY created_at").bind(id)),
-    all<HostedDescription>(db().prepare(`SELECT d.id,d.node_id AS nodeId,d.body,d.author_label AS authorLabel,d.status,d.kind,d.created_at AS createdAt,
+  const detailResults = await db().batch([
+    db().prepare(`SELECT ${reproductionColumns} FROM reproductions WHERE child_node_id=?`).bind(id),
+    db().prepare("SELECT id,child_node_id AS childNodeId FROM parent_edges WHERE parent_node_id=? ORDER BY created_at").bind(id),
+    db().prepare(`SELECT d.id,d.node_id AS nodeId,d.body,d.author_label AS authorLabel,d.status,d.kind,d.created_at AS createdAt,
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
-      FROM node_descriptions d WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id)),
-    all<HostedImage>(db().prepare(`SELECT ${imageDisplayColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id)),
+      FROM node_descriptions d WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id),
+    db().prepare(`SELECT ${imageDisplayColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id),
   ]);
+  const reproduction = (detailResults[0].results[0] as unknown as HostedReproduction | undefined) ?? null;
+  const childEdges = detailResults[1].results as unknown as Array<{ id: string; childNodeId: string }>;
+  const descriptions = detailResults[2].results as unknown as HostedDescription[];
+  const rawImages = detailResults[3].results as unknown as HostedImage[];
   const parents = reproduction ? (await all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (?,?)`).bind(reproduction.parentLowId, reproduction.parentHighId))).map(normalizeNode) : [];
   const children = childEdges.length ? (await all<HostedNode>(
     db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (${childEdges.map(() => "?").join(",")})`)

@@ -55,6 +55,21 @@ interface InitialExistence {
 }
 
 const detailCache = new Map<string, Detail>();
+const detailRequests = new Map<string, Promise<Detail>>();
+
+function requestDetail(nodeId: string, force = false): Promise<Detail> {
+  if (!force && detailCache.has(nodeId)) return Promise.resolve(detailCache.get(nodeId)!);
+  if (!force && detailRequests.has(nodeId)) return detailRequests.get(nodeId)!;
+  const request = fetch(`/api/nodes/${nodeId}`).then((response) => response.json() as Promise<Detail>).then((loaded) => {
+    if (loaded.node) detailCache.set(nodeId, loaded);
+    detailRequests.delete(nodeId);
+    return loaded;
+  }).catch((error) => { detailRequests.delete(nodeId); throw error; });
+  detailRequests.set(nodeId, request);
+  return request;
+}
+
+export function prefetchExistenceDetail(nodeId: string): void { void requestDetail(nodeId); }
 
 const recordLabels: Record<RecordKind, string> = { BIRTH: "诞生", STORY: "记述", DEATH: "死亡", REVIVAL: "复活" };
 const recordColors: Record<RecordKind, string> = {
@@ -100,11 +115,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
   const [lifeBody, setLifeBody] = useState("");
   const [lifeBusy, setLifeBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const load = useCallback(async () => {
-    const loaded = await fetch(`/api/nodes/${nodeId}`).then((response) => response.json() as Promise<Detail>);
-    if (loaded.node) detailCache.set(nodeId, loaded);
-    setDetail(loaded);
-  }, [nodeId]);
+  const load = useCallback(async (force = false) => setDetail(await requestDetail(nodeId, force)), [nodeId]);
   useEffect(() => { setDetail(detailCache.get(nodeId) ?? null); void load(); }, [load, nodeId]);
 
   async function addDescription(event: React.FormEvent) {
@@ -112,7 +123,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     const response = await fetch(`/api/nodes/${nodeId}/descriptions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body, ...(authorLabel ? { authorLabel } : {}) }) });
     const result = await response.json() as { error?: { message?: string } };
     if (!response.ok) return setMessage(result.error?.message ?? "提交失败");
-    setBody(""); setAuthorLabel(""); setMessage("记述已追加且永久保存，不会改变该存在的基因与图片 Prompt。"); void load(); onNodeChanged?.();
+    setBody(""); setAuthorLabel(""); setMessage("记述已追加且永久保存，不会改变该存在的基因与图片 Prompt。"); void load(true); onNodeChanged?.();
   }
 
   async function changeLifeStatus(event: React.FormEvent) {
@@ -123,7 +134,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     const response = await fetch(`/api/nodes/${nodeId}/life`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, description: lifeBody }) });
     const result = await response.json() as { error?: { message?: string } };
     if (!response.ok) setMessage(result.error?.message ?? "状态更新失败");
-    else { setLifeBody(""); setMessage(action === "die" ? "死亡已确认，该存在不能再参与繁衍。" : "复活已确认，该存在可以再次参与繁衍。"); await load(); onNodeChanged?.(); }
+    else { setLifeBody(""); setMessage(action === "die" ? "死亡已确认，该存在不能再参与繁衍。" : "复活已确认，该存在可以再次参与繁衍。"); await load(true); onNodeChanged?.(); }
     setLifeBusy(false);
   }
 
@@ -133,7 +144,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     const response = await fetch(`/api/descriptions/${descriptionId}/feedback`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ voterKey, isTrue }) });
     const result = await response.json() as { error?: { message?: string } };
     if (!response.ok) setMessage(result.error?.message ?? "评价提交失败");
-    else await load();
+    else await load(true);
   }
 
   async function addImage() {
@@ -141,7 +152,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     const response = await fetch(`/api/nodes/${nodeId}/images`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     const result = await response.json() as { error?: { message?: string } };
     setMessage(response.ok ? "新的视觉解释已生成，存在 Hash 保持不变。" : result.error?.message ?? "图片生成失败");
-    if (response.ok) void load();
+    if (response.ok) void load(true);
   }
 
   if (!detail?.node) return <aside className={`${standalone ? "rounded-2xl sm:rounded-3xl" : "fixed inset-x-0 bottom-0 top-14 z-40 w-full border-t md:inset-y-16 md:left-auto md:right-0 md:max-w-xl md:border-l md:border-t-0"} glass overflow-y-auto p-4 shadow-2xl sm:p-6`}>

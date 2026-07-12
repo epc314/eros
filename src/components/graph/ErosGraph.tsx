@@ -77,7 +77,7 @@ function GraphCanvas() {
     const nodes: Node<ErosNodeData>[] = payload.nodes.filter((node) => allowed.has(node.id)).map((node) => {
       const summary = entitySummaries.get(node.id)!;
       return { id: node.id, type: "eros", position: { x: 0, y: 0 }, data: {
-        name: node.name, genomeHex: node.genomeHex, type: node.type, generation: node.generation,
+        id: node.id, name: node.name, genomeHex: node.genomeHex, type: node.type, generation: node.generation,
         isDead: node.isDead,
         descriptionCount: node._count.descriptions, imageCount: node._count.images,
         image: node.images[0]?.thumbnailUrl ?? node.images[0]?.imageDataUrl ?? node.images[0]?.imageUrl ?? undefined,
