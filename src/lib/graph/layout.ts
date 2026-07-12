@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
 const WIDTH = 268;
-const HEIGHT = 250;
+const HEIGHT = 276;
 const COLUMN_GAP = 48;
 const ROW_GAP = 110;
 

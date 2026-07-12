@@ -30,9 +30,9 @@ export function GraphNodeCard({ data, selected }: NodeProps) {
       {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={512} height={320} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-contain" /> : <div className="h-full bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]" />}
       {item.selectedAs && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-fuchsia-500 text-xs font-bold">{item.selectedAs}</span>}
     </div>
-    <div className="flex items-center justify-between gap-3 px-4 py-3">
-      <h3 className="truncate text-sm font-semibold text-cyan-100">{item.primaryEntityZh}</h3>
-      <span className="shrink-0 text-[11px] text-slate-400">{item.imageCount} 图 · {item.descriptionCount} 记述</span>
+    <div className="px-4 py-3">
+      <h3 className="truncate text-xl font-semibold tracking-tight text-white">{item.name}</h3>
+      <div className="mt-2 flex items-center justify-between gap-3"><span className="truncate text-xs font-medium text-cyan-100">{item.primaryEntityZh}</span><span className="shrink-0 text-[11px] text-slate-400">{item.imageCount} 图 · {item.descriptionCount} 记述</span></div>
     </div>
     <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-fuchsia-400" />
   </article>;
