@@ -39,13 +39,26 @@ function GraphCanvas() {
     return () => media.removeEventListener("change", update);
   }, []);
 
+  const nodeById = useMemo(() => new Map(payload?.nodes.map((node) => [node.id, node]) ?? []), [payload]);
+  const entitySummaries = useMemo(() => {
+    const summaries = new Map<string, { primaryEntity: string; primaryEntityZh: string; auxiliaryEntities: string[]; auxiliaryEntitiesZh: string[] }>();
+    for (const node of payload?.nodes ?? []) {
+      const anchors = decodeGenome(node.genomeHex, undefined, node.promptVersion).filter((token) => token.kind === "entity-anchor");
+      const primary = anchors.find((token) => token.role === "primary")!;
+      const auxiliaries = anchors.filter((token) => token.role === "auxiliary");
+      summaries.set(node.id, { primaryEntity: primary.entity, primaryEntityZh: primary.entityZh,
+        auxiliaryEntities: auxiliaries.map((token) => token.entity), auxiliaryEntitiesZh: auxiliaries.map((token) => token.entityZh) });
+    }
+    return summaries;
+  }, [payload]);
+
   const graph = useMemo(() => {
     if (!payload) return { nodes: [] as Node<ErosNodeData>[], edges: [] as Edge[] };
     let allowed = new Set(payload.nodes.map(({ id }) => id));
     const normalizedQuery = query.trim().toLowerCase();
     if (normalizedQuery) allowed = new Set(payload.nodes.filter((node) => node.name.toLowerCase().includes(normalizedQuery) || node.genomeHex.includes(normalizedQuery) || node.id.includes(normalizedQuery)).map(({ id }) => id));
-    if (generation !== "all") allowed = new Set([...allowed].filter((id) => payload.nodes.find((node) => node.id === id)?.generation === Number(generation)));
-    if (rootsOnly) allowed = new Set([...allowed].filter((id) => payload.nodes.find((node) => node.id === id)?.type === "GENESIS"));
+    if (generation !== "all") allowed = new Set([...allowed].filter((id) => nodeById.get(id)?.generation === Number(generation)));
+    if (rootsOnly) allowed = new Set([...allowed].filter((id) => nodeById.get(id)?.type === "GENESIS"));
     if (selectedId && focusMode !== "all") {
       const edges = payload.edges.map((edge) => ({ parentNodeId: edge.parentNodeId, childNodeId: edge.childNodeId }));
       const connected = focusMode === "ancestors" ? ancestorIds(selectedId, edges) : descendantIds(selectedId, edges);
@@ -56,21 +69,18 @@ function GraphCanvas() {
       markerEnd: { type: MarkerType.ArrowClosed, color: "#64748b" }, style: { stroke: "#475569" },
     }));
     const nodes: Node<ErosNodeData>[] = payload.nodes.filter((node) => allowed.has(node.id)).map((node) => {
-      const anchors = decodeGenome(node.genomeHex, undefined, node.promptVersion).filter((token) => token.kind === "entity-anchor");
-      const primary = anchors.find((token) => token.role === "primary")!;
-      const auxiliaries = anchors.filter((token) => token.role === "auxiliary");
+      const summary = entitySummaries.get(node.id)!;
       return { id: node.id, type: "eros", position: { x: 0, y: 0 }, data: {
         name: node.name, genomeHex: node.genomeHex, type: node.type, generation: node.generation,
         descriptionCount: node._count.descriptions, imageCount: node._count.images,
-        image: node.images[0]?.imageDataUrl ?? node.images[0]?.imageUrl ?? undefined,
+        image: node.images[0]?.thumbnailUrl ?? node.images[0]?.imageDataUrl ?? node.images[0]?.imageUrl ?? undefined,
         instability: node.reproduction?.mutationBitCount,
-        primaryEntity: primary.entity, primaryEntityZh: primary.entityZh,
-        auxiliaryEntities: auxiliaries.map((token) => token.entity), auxiliaryEntitiesZh: auxiliaries.map((token) => token.entityZh),
+        ...summary,
         selectedAs: parentIds[0] === node.id ? "A" : parentIds[1] === node.id ? "B" : undefined,
       } };
     });
     return { nodes: layoutGraph(nodes, edges), edges };
-  }, [payload, query, generation, rootsOnly, selectedId, focusMode, parentIds]);
+  }, [payload, query, generation, rootsOnly, selectedId, focusMode, parentIds, nodeById, entitySummaries]);
 
   function selectAsParent(id: string) {
     if (parentIds[0] === id || parentIds[1] === id) return;
@@ -92,7 +102,7 @@ function GraphCanvas() {
           <button onClick={() => fitView({ duration: 500, padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 })} className="glass min-h-11 shrink-0 rounded-xl px-3 text-sm text-slate-300">适应画布</button>
         </div>
       </div>
-      <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} proOptions={{ hideAttribution: true }}>
+      <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
         <Background color="#253044" gap={26} size={1} /><Controls position="bottom-left" showInteractive={false}/>{!isMobile && <MiniMap position="bottom-right" pannable zoomable nodeColor={(node) => (node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
       </ReactFlow>
       <div className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs text-slate-400 sm:block">{graph.nodes.length} 节点 · {graph.edges.length} 亲本边 · 点击节点查看详情</div>

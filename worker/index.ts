@@ -24,7 +24,9 @@ const worker = {
     const url = new URL(request.url);
     if (url.pathname === "/_vinext/image") {
       return handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
+        fetchAsset: (path) => path.startsWith("/api/")
+          ? handler.fetch(new Request(new URL(path, request.url)), env, ctx)
+          : env.ASSETS.fetch(new Request(new URL(path, request.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();

@@ -6,7 +6,7 @@ export interface GraphNodeRecord {
   type: "GENESIS" | "DESCENDANT";
   generation: number;
   _count: { descriptions: number; images: number };
-  images: Array<{ imageDataUrl?: string | null; imageUrl?: string | null }>;
+  images: Array<{ imageDataUrl?: string | null; imageUrl?: string | null; thumbnailUrl?: string | null }>;
   reproduction?: { mutationBitCount: number } | null;
 }
 

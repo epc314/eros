@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- local provider images are runtime data URLs */
+/* eslint-disable @next/next/no-img-element -- graph cards use pre-generated R2 thumbnails */
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
@@ -25,7 +25,7 @@ export function GraphNodeCard({ data, selected }: NodeProps) {
   return <article className={`w-[220px] overflow-hidden rounded-2xl border bg-[#111827] shadow-2xl transition ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
     <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-cyan-400" />
     <div className="relative h-32 overflow-hidden bg-slate-950">
-      {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} className="h-full w-full object-contain" /> : <div className="grid h-full place-items-center bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]"><div className="hash grid grid-cols-4 gap-1 text-center text-[8px] text-cyan-200/60">{tokenHex.slice(0, 4).map((token, index) => <span key={index} className="rounded bg-cyan-300/5 px-1 py-1">{token}</span>)}</div></div>}
+      {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={384} height={224} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-contain" /> : <div className="grid h-full place-items-center bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]"><div className="hash grid grid-cols-4 gap-1 text-center text-[8px] text-cyan-200/60">{tokenHex.slice(0, 4).map((token, index) => <span key={index} className="rounded bg-cyan-300/5 px-1 py-1">{token}</span>)}</div></div>}
       <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-[10px] uppercase tracking-widest text-cyan-200">{item.type === "GENESIS" ? "Root · 创世" : `Gen ${item.generation}`}</span>
       {item.selectedAs && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-fuchsia-500 text-xs font-bold">{item.selectedAs}</span>}
     </div>

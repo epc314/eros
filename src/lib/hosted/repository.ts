@@ -36,10 +36,12 @@ export interface HostedImage {
   r2Key: string | null; contentType: string | null; width: number | null; height: number | null;
   isPrimary: boolean; status: "PENDING" | "COMPLETED" | "FAILED";
   errorMessage: string | null; createdAt: string; imageDataUrl?: null;
+  thumbnailUrl?: string | null;
 }
 
 let schemaPromise: Promise<void> | undefined;
 export function ensureHostedSchema(): Promise<void> {
+  if (process.env.NODE_ENV !== "development") return Promise.resolve();
   schemaPromise ??= getHostedEnv().DB.batch(SCHEMA_STATEMENTS.map((sql) => getHostedEnv().DB.prepare(sql))).then(() => undefined);
   return schemaPromise!;
 }
@@ -71,7 +73,8 @@ const imageColumns = `id, node_id AS nodeId, provider, provider_model AS provide
   is_primary AS isPrimary, status, error_message AS errorMessage, created_at AS createdAt`;
 
 function normalizeImage(row: HostedImage): HostedImage {
-  return { ...row, isPrimary: Boolean(row.isPrimary), imageUrl: row.r2Key ? `/api/images/${row.id}` : row.imageUrl, imageDataUrl: null };
+  return { ...row, isPrimary: Boolean(row.isPrimary), imageUrl: row.r2Key ? `/api/images/${row.id}` : row.imageUrl,
+    thumbnailUrl: row.r2Key ? `/api/thumbnails/${row.id}` : row.imageUrl, imageDataUrl: null };
 }
 
 function configuredTimestamp(): bigint | undefined {
@@ -117,17 +120,21 @@ export async function hostedWorldGraph() {
   await ensureHostedSchema();
   let world = await first<HostedWorld>(db().prepare(`SELECT ${worldColumns} FROM worlds WHERE id = ?`).bind(WORLD_ID));
   if (!world) world = (await initializeHostedWorld()).world;
-  const [nodes, edges, counts, reproductions, images] = await Promise.all([
-    all<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id = ? ORDER BY generation, created_at`).bind(WORLD_ID)),
-    all<{ id: string; parentNodeId: string; childNodeId: string; createdAt: string }>(db().prepare(
-      "SELECT id,parent_node_id AS parentNodeId,child_node_id AS childNodeId,created_at AS createdAt FROM parent_edges ORDER BY created_at")),
-    all<{ nodeId: string; descriptionCount: number; imageCount: number }>(db().prepare(`SELECT n.id AS nodeId,
+  const [nodesResult, edgesResult, countsResult, reproductionsResult, imagesResult] = await db().batch([
+    db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id = ? ORDER BY generation, created_at`).bind(WORLD_ID),
+    db().prepare("SELECT id,parent_node_id AS parentNodeId,child_node_id AS childNodeId,created_at AS createdAt FROM parent_edges ORDER BY created_at"),
+    db().prepare(`SELECT n.id AS nodeId,
       (SELECT COUNT(*) FROM node_descriptions d WHERE d.node_id=n.id AND d.status='VISIBLE') AS descriptionCount,
       (SELECT COUNT(*) FROM generated_images i WHERE i.node_id=n.id AND i.status='COMPLETED') AS imageCount
-      FROM nodes n WHERE n.world_id=?`).bind(WORLD_ID)),
-    all<HostedReproduction>(db().prepare(`SELECT ${reproductionColumns} FROM reproductions`)),
-    all<HostedImage>(db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE status='COMPLETED' ORDER BY is_primary DESC, created_at DESC`)),
+      FROM nodes n WHERE n.world_id=?`).bind(WORLD_ID),
+    db().prepare(`SELECT ${reproductionColumns} FROM reproductions`),
+    db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE status='COMPLETED' ORDER BY is_primary DESC, created_at DESC`),
   ]);
+  const nodes = nodesResult.results as unknown as HostedNode[];
+  const edges = edgesResult.results as unknown as Array<{ id: string; parentNodeId: string; childNodeId: string; createdAt: string }>;
+  const counts = countsResult.results as unknown as Array<{ nodeId: string; descriptionCount: number; imageCount: number }>;
+  const reproductions = reproductionsResult.results as unknown as HostedReproduction[];
+  const images = imagesResult.results as unknown as HostedImage[];
   const countMap = new Map(counts.map((item) => [item.nodeId, item]));
   const reproductionMap = new Map(reproductions.map((item) => [item.childNodeId, item]));
   const imageMap = new Map<string, HostedImage>();
