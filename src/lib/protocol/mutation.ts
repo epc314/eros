@@ -13,10 +13,10 @@ export function calculateMutationBudget(sameBitCount: number): number {
   return Math.min(sameBitCount, BASE_MUTATION_BITS + Number(extra));
 }
 
-export function selectMutationPositions(similarityMaskHex: string, mutationSeed: Uint8Array, count: number): number[] {
+export function selectMutationPositions(similarityMaskHex: string, mutationSeed: Uint8Array, count: number, protectedPrefixBits = 0): number[] {
   const mask = genomeHexToBytes(similarityMaskHex);
   const eligible: number[] = [];
-  for (let position = 0; position < GENOME_BITS; position++) if (getBit(mask, position)) eligible.push(position);
+  for (let position = protectedPrefixBits; position < GENOME_BITS; position++) if (getBit(mask, position)) eligible.push(position);
   const ranked = eligible.map((position) => ({
     position,
     rank: hash256([

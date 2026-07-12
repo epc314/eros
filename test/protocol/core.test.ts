@@ -103,6 +103,8 @@ describe("reproduction", () => {
       ][result.segmentSwapMode];
       expect(result.baseGenomeHex).toBe(expected);
       expect(result.baseGenomeHex.slice(0, 8)).toBe(c0Source.c00);
+      expect(result.childGenomeHex.slice(0, 8)).toBe(c0Source.c00);
+      expect(result.flippedBitPositions.every((position) => position >= 32)).toBe(true);
     }
   });
 });

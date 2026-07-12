@@ -73,12 +73,12 @@ export function reproduce(parentA: ProtocolParent, parentB: ProtocolParent, chil
   const baseGenomeHex = chromosome0Hex + chromosome1Hex;
   const similarity = calculateGenomeSimilarity(parentLow.genomeHex, parentHigh.genomeHex);
   const requestedMutationBits = calculateMutationBudget(similarity.sameBitCount);
-  const mutationBitCount = Math.min(requestedMutationBits, similarity.sameBitCount);
   const mutationSeed = hash512([
     encodeUtf8("EROS_MUTATION_SEED"), encodeUtf8(PROTOCOL_VERSION), lowBytes, highBytes,
     encodeUtf8(normalizedName), chromosomeHexToBytes(lowUnusedHex), chromosomeHexToBytes(highUnusedHex),
   ]);
-  const flippedBitPositions = selectMutationPositions(similarity.similarityMaskHex, mutationSeed, mutationBitCount);
+  const flippedBitPositions = selectMutationPositions(similarity.similarityMaskHex, mutationSeed, requestedMutationBits, PRIMARY_ENTITY_SEGMENT_BITS);
+  const mutationBitCount = flippedBitPositions.length;
   const mutationMask = createMutationMask(flippedBitPositions);
   const childGenome = xorBytes(genomeHexToBytes(baseGenomeHex), mutationMask);
   const childGenomeHex = bytesToHex(childGenome);
