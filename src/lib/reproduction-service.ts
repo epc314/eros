@@ -53,7 +53,7 @@ export async function createDescendant(parentAId: string, parentBId: string, raw
       } });
       await tx.reproduction.create({ data: {
         id: newRecordId(), childNodeId: created.id, parentLowId: result.parentLowId, parentHighId: result.parentHighId,
-        lowChoice: result.lowChoice, highChoice: result.highChoice, lowSelectedHex: result.lowSelectedHex,
+        lowChoice: result.lowChoice, highChoice: result.highChoice, segmentSwapMode: result.segmentSwapMode, lowSelectedHex: result.lowSelectedHex,
         lowUnusedHex: result.lowUnusedHex, highSelectedHex: result.highSelectedHex, highUnusedHex: result.highUnusedHex,
         baseGenomeHex: result.baseGenomeHex, hammingDistance: result.similarity.hammingDistance,
         sameBitCount: result.similarity.sameBitCount, similarityRatio: result.similarity.similarityRatio,

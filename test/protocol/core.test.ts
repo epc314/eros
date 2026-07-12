@@ -72,19 +72,37 @@ describe("reproduction", () => {
     expect(reproduce(a, b, "One").flippedBitPositions).not.toEqual(reproduce(a, b, "Two").flippedBitPositions);
     expect(reproduce(a, b, "One")).toEqual(reproduce(a, b, "One"));
   });
-  it("keeps chromosome indices stable and inherits an unmutated primary from a parent", () => {
+  it("covers all eight segmented pairings while preserving the selected c00 subject segment", () => {
     const a = parent("Gaia"); const b = parent("Eros");
-    const result = reproduce(a, b, "Stable subject");
     const [low, high] = a.genomeHex < b.genomeHex ? [a, b] : [b, a];
-    expect([result.lowChoice, result.highChoice].sort()).toEqual([0, 1]);
-    const expectedC0 = result.lowChoice === 0 ? splitGenome(low.genomeHex).chromosome0 : splitGenome(high.genomeHex).chromosome0;
-    const expectedC1 = result.lowChoice === 1 ? splitGenome(low.genomeHex).chromosome1 : splitGenome(high.genomeHex).chromosome1;
-    expect(result.baseGenomeHex).toBe(expectedC0 + expectedC1);
-    expect(result.chromosome0ParentId).toBe(result.lowChoice === 0 ? low.id : high.id);
-    expect(result.chromosome1ParentId).toBe(result.lowChoice === 1 ? low.id : high.id);
-    expect([low.genomeHex.slice(0, 4), high.genomeHex.slice(0, 4)]).toContain(result.baseGenomeHex.slice(0, 4));
-    if (result.flippedBitPositions.every((position) => position >= 16)) {
-      expect(result.childGenomeHex.slice(0, 4)).toBe(result.baseGenomeHex.slice(0, 4));
+    const results = new Map<number, ReturnType<typeof reproduce>>();
+    for (let index = 0; index < 10_000 && results.size < 8; index++) {
+      const result = reproduce(a, b, `Segment mode ${index}`);
+      results.set(result.selectionBits, result);
+    }
+    expect(results.size).toBe(8);
+    const parents = new Map([[low.id, low], [high.id, high]]);
+    const segments = (genomeHex: string) => {
+      const genome = splitGenome(genomeHex);
+      return {
+        c00: genome.chromosome0.slice(0, 8), c01: genome.chromosome0.slice(8),
+        c10: genome.chromosome1.slice(0, 8), c11: genome.chromosome1.slice(8),
+      };
+    };
+    for (const [selectionBits, result] of results) {
+      expect([result.lowChoice, result.highChoice].sort()).toEqual([0, 1]);
+      expect(result.lowChoice).toBe(selectionBits & 1);
+      expect(result.segmentSwapMode).toBe((selectionBits >> 1) & 0b11);
+      const c0Source = segments(parents.get(result.chromosome0ParentId)!.genomeHex);
+      const c1Source = segments(parents.get(result.chromosome1ParentId)!.genomeHex);
+      const expected = [
+        c0Source.c00 + c0Source.c01 + c1Source.c10 + c1Source.c11,
+        c0Source.c00 + c1Source.c11 + c1Source.c10 + c0Source.c01,
+        c0Source.c00 + c0Source.c01 + c1Source.c10 + c0Source.c11,
+        c0Source.c00 + c1Source.c01 + c1Source.c10 + c1Source.c11,
+      ][result.segmentSwapMode];
+      expect(result.baseGenomeHex).toBe(expected);
+      expect(result.baseGenomeHex.slice(0, 8)).toBe(c0Source.c00);
     }
   });
 });

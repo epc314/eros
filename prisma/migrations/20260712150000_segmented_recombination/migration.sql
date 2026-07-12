@@ -1,0 +1,1 @@
+ALTER TABLE "Reproduction" ADD COLUMN "segmentSwapMode" INTEGER NOT NULL DEFAULT 0;

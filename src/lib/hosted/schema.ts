@@ -16,6 +16,7 @@ export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS reproductions (
     id TEXT PRIMARY KEY, child_node_id TEXT NOT NULL UNIQUE, parent_low_id TEXT NOT NULL,
     parent_high_id TEXT NOT NULL, low_choice INTEGER NOT NULL, high_choice INTEGER NOT NULL,
+    segment_swap_mode INTEGER NOT NULL DEFAULT 0,
     low_selected_hex TEXT NOT NULL, low_unused_hex TEXT NOT NULL,
     high_selected_hex TEXT NOT NULL, high_unused_hex TEXT NOT NULL,
     base_genome_hex TEXT NOT NULL, hamming_distance INTEGER NOT NULL,

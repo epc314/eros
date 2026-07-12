@@ -75,6 +75,7 @@ model Reproduction {
   parentHighId              String
   lowChoice                 Int
   highChoice                Int
+  segmentSwapMode           Int      @default(0)
   lowSelectedHex            String
   lowUnusedHex              String
   highSelectedHex           String

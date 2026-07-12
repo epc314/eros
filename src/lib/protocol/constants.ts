@@ -1,11 +1,12 @@
 export const PROJECT_NAME = "Eros";
-export const PROTOCOL_VERSION = "eros-v2";
+export const PROTOCOL_VERSION = "eros-v3";
 export const IMAGE_PROMPT_VERSION = "eros-entity-prompt-v8";
 export const GENOME_BITS = 512;
 export const GENOME_BYTES = 64;
 export const CHROMOSOME_BITS = 256;
 export const CHROMOSOME_BYTES = 32;
 export const TOKEN_BITS = 16;
+export const PRIMARY_ENTITY_SEGMENT_BITS = TOKEN_BITS * 2;
 export const TOKEN_COUNT = 32;
 export const TOKENS_PER_CHROMOSOME = 16;
 export const ENTITY_ANCHOR_POSITIONS = [0, 8, 16, 24] as const;
@@ -28,6 +29,8 @@ export function assertProtocolConstants(): void {
     CHROMOSOME_BYTES === CHROMOSOME_BITS / 8,
     GENOME_BITS === TOKEN_BITS * TOKEN_COUNT,
     TOKEN_COUNT === TOKENS_PER_CHROMOSOME * 2,
+    PRIMARY_ENTITY_SEGMENT_BITS === 32,
+    PRIMARY_ENTITY_SEGMENT_BITS < CHROMOSOME_BITS,
     ENTITY_ANCHOR_COUNT * 2 === ENTITY_TOKEN_COUNT,
     ENTITY_TOKEN_COUNT + DESCRIPTOR_TOKEN_COUNT === TOKEN_COUNT,
     VOCAB_SIZE === 2 ** TOKEN_BITS,

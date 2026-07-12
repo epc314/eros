@@ -28,7 +28,7 @@ export interface HostedDescription {
 }
 export interface HostedReproduction {
   id: string; childNodeId: string; parentLowId: string; parentHighId: string;
-  lowChoice: number; highChoice: number; lowSelectedHex: string; lowUnusedHex: string;
+  lowChoice: number; highChoice: number; segmentSwapMode: number; lowSelectedHex: string; lowUnusedHex: string;
   highSelectedHex: string; highUnusedHex: string; baseGenomeHex: string;
   hammingDistance: number; sameBitCount: number; similarityRatio: number;
   similarityMaskHex: string; requestedMutationBits: number; mutationBitCount: number;
@@ -64,6 +64,7 @@ const worldColumns = `id, name, protocol_version AS protocolVersion,
   genesis_timestamp_ms AS genesisTimestampMs, initialized_at AS initializedAt`;
 const reproductionColumns = `id, child_node_id AS childNodeId, parent_low_id AS parentLowId,
   parent_high_id AS parentHighId, low_choice AS lowChoice, high_choice AS highChoice,
+  segment_swap_mode AS segmentSwapMode,
   low_selected_hex AS lowSelectedHex, low_unused_hex AS lowUnusedHex,
   high_selected_hex AS highSelectedHex, high_unused_hex AS highUnusedHex,
   base_genome_hex AS baseGenomeHex, hamming_distance AS hammingDistance,
@@ -274,11 +275,11 @@ export async function createHostedDescendant(parentAId: string, parentBId: strin
     db().prepare(`INSERT INTO nodes (id,world_id,protocol_version,prompt_version,type,name,name_key,genome_hex,chromosome0_hex,chromosome1_hex,generation,is_dead,records_locked,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(node.id, WORLD_ID, PROTOCOL_VERSION, IMAGE_PROMPT_VERSION, node.type, node.name, nameKey,
         node.genomeHex, node.chromosome0Hex, node.chromosome1Hex, generation, 0, 0, createdAt),
-    db().prepare(`INSERT INTO reproductions (id,child_node_id,parent_low_id,parent_high_id,low_choice,high_choice,low_selected_hex,low_unused_hex,
+    db().prepare(`INSERT INTO reproductions (id,child_node_id,parent_low_id,parent_high_id,low_choice,high_choice,segment_swap_mode,low_selected_hex,low_unused_hex,
       high_selected_hex,high_unused_hex,base_genome_hex,hamming_distance,same_bit_count,similarity_ratio,similarity_mask_hex,
       requested_mutation_bits,mutation_bit_count,mutation_seed_hex,mutation_mask_hex,flipped_bit_positions_json,changed_token_positions_json,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(newRecordId(), node.id, result.parentLowId, result.parentHighId,
-        result.lowChoice, result.highChoice, result.lowSelectedHex, result.lowUnusedHex, result.highSelectedHex, result.highUnusedHex,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(newRecordId(), node.id, result.parentLowId, result.parentHighId,
+        result.lowChoice, result.highChoice, result.segmentSwapMode, result.lowSelectedHex, result.lowUnusedHex, result.highSelectedHex, result.highUnusedHex,
         result.baseGenomeHex, result.similarity.hammingDistance, result.similarity.sameBitCount, result.similarity.similarityRatio,
         result.similarity.similarityMaskHex, result.requestedMutationBits, result.mutationBitCount, result.mutationSeedHex,
         result.mutationMaskHex, JSON.stringify(result.flippedBitPositions), JSON.stringify(preview.mutationStats.changedTokenPositions), createdAt),

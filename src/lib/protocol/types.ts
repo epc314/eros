@@ -24,6 +24,8 @@ export interface ReproductionResult {
   normalizedName: string;
   lowChoice: 0 | 1;
   highChoice: 0 | 1;
+  selectionBits: number;
+  segmentSwapMode: 0 | 1 | 2 | 3;
   chromosome0ParentId: string;
   chromosome1ParentId: string;
   lowSelectedHex: Hex256;
