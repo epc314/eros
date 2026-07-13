@@ -63,7 +63,7 @@ npm run backup:hosted
 
 ## LLM 上下文接口
 
-`GET /api/world/context` 返回精简的文字图谱数据；添加 `?format=text` 可获得适合直接放入模型上下文的行式文本。可选参数为 `lang=zh|en|both`、`records=0..50` 和 `disputed=include|exclude`。
+`GET /api/world/context` 返回精简的文字图谱数据和全部记述、票数及争议标记；添加 `?format=text` 可获得适合直接放入模型上下文的行式文本，可选 `lang=zh|en|both`。`GET /api/existences/{名称或ID}` 返回单个存在的全部详细信息。
 
 ## 验证
 

@@ -6,8 +6,6 @@ export type StoryContextLanguage = "zh" | "en" | "both";
 
 export interface StoryContextOptions {
   language: StoryContextLanguage;
-  recordsPerExistence: number;
-  includeDisputed: boolean;
 }
 
 export interface StoryContextNodeInput {
@@ -38,10 +36,12 @@ export interface StoryContextRecordInput {
 }
 
 export interface StoryContextRecord {
+  id: string;
   type: "birth" | "story" | "death" | "revival";
   text: string;
   author?: string;
-  disputed?: true;
+  createdAt: string;
+  feedback: { trueVotes: number; falseVotes: number; disputed: boolean };
 }
 
 export interface StoryContextExistence {
@@ -51,17 +51,12 @@ export interface StoryContextExistence {
   entity: { primary: string; auxiliaries: string[] };
   parents: string[];
   records: StoryContextRecord[];
-  recordsOmitted?: number;
 }
 
 export interface StoryContext {
   schema: "eros-world-context-v1";
   generatedAt: string;
-  view: {
-    language: StoryContextLanguage;
-    disputedRecords: "included" | "excluded";
-    recordsPerExistence: number;
-  };
+  view: { language: StoryContextLanguage };
   world: {
     name: string;
     existenceCount: number;
@@ -72,39 +67,27 @@ export interface StoryContext {
   generations: Array<{ generation: number; existences: StoryContextExistence[] }>;
 }
 
-function compact(value: string): string {
-  return value.replace(/\s+/gu, " ").trim();
-}
-
 function entityLabel(token: EntityAnchorToken, language: StoryContextLanguage): string {
   if (language === "zh") return token.entityZh;
   if (language === "en") return token.entity;
   return `${token.entityZh} / ${token.entity}`;
 }
 
-function selectRecords(
-  inputs: StoryContextRecordInput[],
-  options: StoryContextOptions,
-): { records: StoryContextRecord[]; omitted: number } {
-  const eligible = inputs
-    .filter((item) => options.includeDisputed || item.falseCount <= item.trueCount)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-  const limit = options.recordsPerExistence;
-  let selected = eligible;
-  if (eligible.length > limit) {
-    if (limit === 0) selected = [];
-    else if (limit === 1) selected = [eligible[0]];
-    else selected = [eligible[0], ...eligible.slice(-(limit - 1))];
-  }
-  return {
-    records: selected.map((item) => ({
+function storyRecords(inputs: StoryContextRecordInput[]): StoryContextRecord[] {
+  return [...inputs]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+    .map((item) => ({
+      id: item.id,
       type: item.kind.toLowerCase() as StoryContextRecord["type"],
-      text: compact(item.body),
-      ...(item.authorLabel ? { author: compact(item.authorLabel) } : {}),
-      ...(item.falseCount > item.trueCount ? { disputed: true as const } : {}),
-    })),
-    omitted: eligible.length - selected.length,
-  };
+      text: item.body,
+      ...(item.authorLabel ? { author: item.authorLabel } : {}),
+      createdAt: item.createdAt,
+      feedback: {
+        trueVotes: item.trueCount,
+        falseVotes: item.falseCount,
+        disputed: item.falseCount > item.trueCount,
+      },
+    }));
 }
 
 export function buildStoryContext(input: {
@@ -139,7 +122,6 @@ export function buildStoryContext(input: {
       .filter((token): token is EntityAnchorToken => token.kind === "entity-anchor");
     const primary = anchors.find((token) => token.role === "primary");
     const auxiliaries = anchors.filter((token) => token.role === "auxiliary");
-    const selected = selectRecords(recordsByNode.get(node.id) ?? [], input.options);
     const existence: StoryContextExistence = {
       name: node.name,
       status: node.isDead ? "dead" : "alive",
@@ -149,8 +131,7 @@ export function buildStoryContext(input: {
         auxiliaries: auxiliaries.map((token) => entityLabel(token, input.options.language)),
       },
       parents: [...new Set(parentsByChild.get(node.id) ?? [])].sort((a, b) => a.localeCompare(b)),
-      records: selected.records,
-      ...(selected.omitted ? { recordsOmitted: selected.omitted } : {}),
+      records: storyRecords(recordsByNode.get(node.id) ?? []),
     };
     const generation = grouped.get(node.generation) ?? [];
     generation.push(existence);
@@ -164,11 +145,7 @@ export function buildStoryContext(input: {
   return {
     schema: "eros-world-context-v1",
     generatedAt: input.generatedAt ?? new Date().toISOString(),
-    view: {
-      language: input.options.language,
-      disputedRecords: input.options.includeDisputed ? "included" : "excluded",
-      recordsPerExistence: input.options.recordsPerExistence,
-    },
+    view: { language: input.options.language },
     world: {
       name: input.worldName,
       existenceCount: input.nodes.length,
@@ -184,7 +161,7 @@ export function formatStoryContextText(context: StoryContext): string {
   const lines = [
     "EROS_WORLD_CONTEXT v1",
     `world=${JSON.stringify(context.world.name)} | generated_at=${context.generatedAt} | existences=${context.world.existenceCount} | alive=${context.world.aliveCount} | dead=${context.world.deadCount} | generations=${context.world.generationCount}`,
-    `view language=${context.view.language} | disputed=${context.view.disputedRecords} | records_per_existence=${context.view.recordsPerExistence}`,
+    `view language=${context.view.language} | records=complete`,
     "semantics parents=incoming_edges | records=chronological | disputed=false_votes_exceed_true_votes",
   ];
   for (const group of context.generations) {
@@ -193,9 +170,8 @@ export function formatStoryContextText(context: StoryContext): string {
       lines.push(`existence=${JSON.stringify(existence.name)} | status=${existence.status}${existence.locked ? " | locked=true" : ""} | primary=${JSON.stringify(existence.entity.primary)} | auxiliaries=${JSON.stringify(existence.entity.auxiliaries)} | parents=${JSON.stringify(existence.parents)}`);
       if (!existence.records.length) lines.push("  records=[]");
       for (const record of existence.records) {
-        lines.push(`  record type=${record.type}${record.disputed ? " | disputed=true" : ""}${record.author ? ` | author=${JSON.stringify(record.author)}` : ""} | text=${JSON.stringify(record.text)}`);
+        lines.push(`  record id=${JSON.stringify(record.id)} | type=${record.type} | created_at=${record.createdAt}${record.author ? ` | author=${JSON.stringify(record.author)}` : ""} | true_votes=${record.feedback.trueVotes} | false_votes=${record.feedback.falseVotes} | disputed=${record.feedback.disputed} | text=${JSON.stringify(record.text)}`);
       }
-      if (existence.recordsOmitted) lines.push(`  records_omitted=${existence.recordsOmitted}`);
     }
   }
   return `${lines.join("\n")}\n`;

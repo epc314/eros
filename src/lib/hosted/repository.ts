@@ -221,7 +221,7 @@ export async function getHostedNode(id: string) {
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
       FROM node_descriptions d WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id),
-    db().prepare(`SELECT ${imageDisplayColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id),
+    db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id),
   ]);
   const reproduction = (detailResults[0].results[0] as unknown as HostedReproduction | undefined) ?? null;
   const childEdges = detailResults[1].results as unknown as Array<{ id: string; childNodeId: string }>;
@@ -233,6 +233,17 @@ export async function getHostedNode(id: string) {
       .bind(...childEdges.map(({ childNodeId }) => childNodeId)),
   )).map(normalizeNode) : [];
   return { node, parents, children, reproduction, descriptions: descriptions.map((item) => ({ ...item, trueCount: Number(item.trueCount), falseCount: Number(item.falseCount) })), images: rawImages.map(normalizeImage) };
+}
+
+export async function getHostedNodeByReference(reference: string) {
+  await ensureHostedSchema();
+  const normalizedReference = normalizeName(reference);
+  const lowerReference = normalizedReference.toLowerCase();
+  const match = await first<{ id: string }>(db().prepare(`SELECT id FROM nodes
+    WHERE id=? OR name_key=? ORDER BY CASE WHEN id=? THEN 0 ELSE 1 END LIMIT 1`)
+    .bind(lowerReference, createNameKey(normalizedReference), lowerReference));
+  if (!match) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
+  return getHostedNode(match.id);
 }
 
 export async function createHostedGenesis(rawName: string, suppliedDescription?: string) {

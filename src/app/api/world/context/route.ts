@@ -16,26 +16,13 @@ function choice<T extends string>(value: string | null, allowed: readonly T[], f
   throw new ApiFailure("INVALID_QUERY", `${name} must be one of: ${allowed.join(", ")}.`, 400);
 }
 
-function recordLimit(value: string | null): number {
-  if (value === null) return 12;
-  if (!/^\d{1,2}$/.test(value)) throw new ApiFailure("INVALID_QUERY", "records must be an integer from 0 to 50.", 400);
-  const parsed = Number(value);
-  if (parsed > 50) throw new ApiFailure("INVALID_QUERY", "records must be an integer from 0 to 50.", 400);
-  return parsed;
-}
-
 export async function GET(request: Request) {
   try {
     enforceRateLimit(`world-context:${requestAddress(request)}`, 120, 60_000);
     const params = new URL(request.url).searchParams;
     const format = choice(params.get("format"), ["json", "text"] as const, "json", "format");
     const language = choice(params.get("lang"), ["zh", "en", "both"] as const, "zh", "lang") as StoryContextLanguage;
-    const disputed = choice(params.get("disputed"), ["include", "exclude"] as const, "include", "disputed");
-    const context = await hostedWorldContext({
-      language,
-      recordsPerExistence: recordLimit(params.get("records")),
-      includeDisputed: disputed === "include",
-    });
+    const context = await hostedWorldContext({ language });
     if (format === "text") return new Response(formatStoryContextText(context), { headers: {
       ...responseHeaders, "content-type": "text/plain; charset=utf-8",
     } });
