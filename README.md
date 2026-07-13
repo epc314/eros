@@ -61,6 +61,10 @@ npm run backup:hosted
 
 默认备份到 `~/Documents/Eros Backups/eros-database-latest.json`。脚本会原子覆盖同名文件，只保留最新备份；导出失败时不会破坏已有文件。
 
+## LLM 上下文接口
+
+`GET /api/world/context` 返回精简的文字图谱数据；添加 `?format=text` 可获得适合直接放入模型上下文的行式文本。可选参数为 `lang=zh|en|both`、`records=0..50` 和 `disputed=include|exclude`。
+
 ## 验证
 
 ```bash

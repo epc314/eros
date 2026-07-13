@@ -7,6 +7,7 @@ import { createNameKey, normalizeName } from "../protocol/normalization";
 import { reproduce } from "../protocol/reproduction";
 import { calculateMutationStats } from "../protocol/token-decoder";
 import { descendantBirthRecord, EROS_BIRTH_RECORD, EROS_DEATH_RECORD, genesisBirthRecord, type DescriptionKind } from "../story";
+import { buildStoryContext, type StoryContextOptions } from "../story-context";
 import { getHostedEnv } from "./env";
 import { SCHEMA_STATEMENTS } from "./schema";
 
@@ -167,6 +168,29 @@ export async function hostedWorldGraph() {
     _count: { descriptions: Number(countMap.get(node.id)?.descriptionCount ?? 0), images: Number(countMap.get(node.id)?.imageCount ?? 0) },
     reproduction: reproductionMap.get(node.id) ?? null, images: imageMap.has(node.id) ? [imageMap.get(node.id)!] : [],
   })) };
+}
+
+export async function hostedWorldContext(options: StoryContextOptions) {
+  await ensureHostedSchema();
+  let world = await first<HostedWorld>(db().prepare(`SELECT ${worldColumns} FROM worlds WHERE id = ?`).bind(WORLD_ID));
+  if (!world) world = (await initializeHostedWorld()).world;
+  const [nodesResult, edgesResult, descriptionsResult] = await db().batch([
+    db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE world_id = ? ORDER BY generation, created_at, name`).bind(WORLD_ID),
+    db().prepare(`SELECT pe.parent_node_id AS parentNodeId, pe.child_node_id AS childNodeId
+      FROM parent_edges pe JOIN nodes child ON child.id=pe.child_node_id
+      WHERE child.world_id=? ORDER BY child.generation, pe.created_at, pe.parent_node_id`).bind(WORLD_ID),
+    db().prepare(`SELECT d.id,d.node_id AS nodeId,d.body,d.author_label AS authorLabel,d.kind,d.created_at AS createdAt,
+      (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
+      (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
+      FROM node_descriptions d JOIN nodes n ON n.id=d.node_id
+      WHERE n.world_id=? AND d.status='VISIBLE' ORDER BY d.created_at,d.id`).bind(WORLD_ID),
+  ]);
+  const nodes = (nodesResult.results as unknown as HostedNode[]).map(normalizeNode);
+  const edges = edgesResult.results as unknown as Array<{ parentNodeId: string; childNodeId: string }>;
+  const descriptions = (descriptionsResult.results as unknown as HostedDescription[]).map((item) => ({
+    ...item, trueCount: Number(item.trueCount), falseCount: Number(item.falseCount),
+  }));
+  return buildStoryContext({ worldName: world.name, nodes, edges, records: descriptions, options });
 }
 
 export async function listHostedNodes(filters: { query?: string; generation?: number; type?: "GENESIS" | "DESCENDANT"; page: number }) {
