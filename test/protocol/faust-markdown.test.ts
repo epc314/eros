@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rehypeFaustExistenceLinks, splitFaustExistenceNames } from "../../src/lib/faust-markdown";
+import { normalizeFaustMarkdown, rehypeFaustExistenceLinks, splitFaustExistenceNames } from "../../src/lib/faust-markdown";
 
 const existences = [
   { id: "gaia-id", name: "Gaia" },
@@ -9,6 +9,11 @@ const existences = [
 ];
 
 describe("Faust existence links", () => {
+  it("forces standalone thematic rules to render as dividers instead of setext headings", () => {
+    expect(normalizeFaustMarkdown("**Gaia**\n*Eros*\n---\nGaia 与 Eros"))
+      .toBe("**Gaia**\n*Eros*\n\n---\n\nGaia 与 Eros");
+  });
+
   it("matches canonical names exactly without linking parts of other words", () => {
     const segments = splitFaustExistenceNames("Gaia 与 Eros Prime 看着 Erosian 和 😧。", existences);
     expect(segments.filter((item) => item.existence).map((item) => item.existence?.name))

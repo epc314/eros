@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { FAUST_GREETING, FAUST_QUICK_REPLY } from "@/lib/faust";
-import { rehypeFaustExistenceLinks, type FaustExistenceLink } from "@/lib/faust-markdown";
+import { normalizeFaustMarkdown, rehypeFaustExistenceLinks, type FaustExistenceLink } from "@/lib/faust-markdown";
 
 interface SearchExistence {
   id: string;
@@ -52,7 +52,7 @@ function FaustMarkdown({ content, existenceLinks }: { content: string; existence
           ? <Link href={href} target="_blank" rel="noreferrer" title={title} className="font-semibold text-amber-200 underline decoration-amber-200/35 underline-offset-2 hover:text-amber-100">{children}</Link>
           : <a href={href} target="_blank" rel="noreferrer" title={title} className="text-cyan-300 underline decoration-cyan-300/30 underline-offset-2 hover:text-cyan-200">{children}</a>,
       }}
-    >{content}</ReactMarkdown>
+    >{normalizeFaustMarkdown(content)}</ReactMarkdown>
   </div>;
 }
 

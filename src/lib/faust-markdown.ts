@@ -27,6 +27,20 @@ function isWordCharacter(value: string | undefined): boolean {
   return value !== undefined && WORD_CHARACTER.test(value);
 }
 
+export function normalizeFaustMarkdown(content: string): string {
+  const lines = content.split("\n");
+  const normalized: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\s*(?:-{3,}|_{3,}|\*{3,})\s*$/.test(line)) {
+      if (normalized.length && normalized.at(-1) !== "") normalized.push("");
+      normalized.push(line.trim());
+      if (index < lines.length - 1 && lines[index + 1] !== "") normalized.push("");
+    } else normalized.push(line);
+  }
+  return normalized.join("\n");
+}
+
 export function splitFaustExistenceNames(text: string, existences: FaustExistenceLink[]): FaustTextSegment[] {
   const linksByName = new Map(existences.filter((item) => item.name).map((item) => [item.name, item]));
   const names = [...linksByName.keys()].sort((a, b) => b.length - a.length || a.localeCompare(b));
