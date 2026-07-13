@@ -11,6 +11,8 @@ export interface ErosHostedEnv {
   EROS_SETUP_TOKEN?: string;
   EROS_BACKUP_TOKEN?: string;
   EROS_WORLD_GENESIS_TIMESTAMP_MS?: string;
+  DEEPSEEK_API_KEY?: string;
+  DEEPSEEK_MODEL?: string;
 }
 
 export function getHostedEnv(): ErosHostedEnv {

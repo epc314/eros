@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FaustChat } from "@/components/faust/FaustChat";
 import { PROTOCOL_VERSION } from "@/lib/protocol/constants";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
@@ -16,5 +17,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <nav className="flex gap-3 text-sm text-slate-400 sm:gap-4"><Link className="rounded-lg px-2 py-2 hover:text-white" href="/">图谱</Link><Link className="rounded-lg px-2 py-2 hover:text-white" href="/protocol">协议</Link></nav>
     </header>
     {children}
+    <FaustChat />
   </body></html>;
 }
