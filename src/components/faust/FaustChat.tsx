@@ -86,6 +86,12 @@ export function FaustChat() {
     finally { setBusy(false); }
   }
 
+  function resetSession() {
+    if (busy) return;
+    if (messages.length > 1 && !window.confirm("重置后将清空当前浮士德对话，且无法恢复。是否继续？")) return;
+    setMessages([initialMessage]); setDraft(""); setSelected([]); setPickerOpen(false); setSearch(""); setError("");
+  }
+
   if (!open) return <button type="button" onClick={() => setOpen(true)} aria-label="展开浮士德对话"
     className="fixed left-2 top-[46%] z-[70] flex min-h-12 items-center gap-2 rounded-r-full border border-l-0 border-amber-200/20 bg-[#17130f]/95 py-2 pl-2 pr-4 text-sm text-amber-100 shadow-2xl backdrop-blur-xl sm:left-0">
     <span className="grid h-8 w-8 place-items-center rounded-full border border-amber-200/30 bg-amber-100/10 font-serif text-lg">F</span>
@@ -96,6 +102,7 @@ export function FaustChat() {
     <header className="flex shrink-0 items-center gap-3 border-b border-amber-100/10 px-4 py-3">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-amber-200/25 bg-amber-100/10 font-serif text-xl text-amber-100">F</span>
       <div className="min-w-0 flex-1"><h2 className="font-serif text-lg text-amber-50">浮士德</h2><p className="text-[11px] tracking-[.12em] text-amber-100/45">EROS 史诗的讲述者</p></div>
+      <button type="button" onClick={resetSession} disabled={busy} aria-label="重置浮士德对话" className="min-h-9 rounded-full border border-white/10 px-3 text-xs text-slate-400 hover:border-amber-100/20 hover:text-amber-100 disabled:opacity-30">重置</button>
       <button type="button" onClick={() => setOpen(false)} aria-label="收起浮士德对话" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xl text-slate-400 hover:text-white">‹</button>
     </header>
 
