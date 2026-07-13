@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { FAUST_GREETING, FAUST_QUICK_REPLY } from "@/lib/faust";
+import { rehypeFaustExistenceLinks, type FaustExistenceLink } from "@/lib/faust-markdown";
 
 interface SearchExistence {
   id: string;
@@ -22,6 +26,36 @@ interface ChatMessage {
 
 const initialMessage: ChatMessage = { id: "faust-introduction", role: "assistant", content: FAUST_GREETING };
 
+function FaustMarkdown({ content, existenceLinks }: { content: string; existenceLinks: FaustExistenceLink[] }) {
+  return <div className="min-w-0 break-words">
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeFaustExistenceLinks(existenceLinks)]}
+      components={{
+        p: ({ children }) => <p className="mb-2 whitespace-pre-wrap last:mb-0">{children}</p>,
+        strong: ({ children }) => <strong className="font-semibold text-amber-50">{children}</strong>,
+        em: ({ children }) => <em className="italic text-slate-100">{children}</em>,
+        hr: () => <hr className="my-3 border-0 border-t border-amber-100/20" />,
+        h1: ({ children }) => <h1 className="mb-2 mt-3 font-serif text-lg font-semibold text-amber-50 first:mt-0">{children}</h1>,
+        h2: ({ children }) => <h2 className="mb-2 mt-3 font-serif text-base font-semibold text-amber-50 first:mt-0">{children}</h2>,
+        h3: ({ children }) => <h3 className="mb-1.5 mt-3 font-semibold text-amber-50 first:mt-0">{children}</h3>,
+        ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>,
+        ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>,
+        li: ({ children }) => <li className="pl-0.5">{children}</li>,
+        blockquote: ({ children }) => <blockquote className="my-2 border-l-2 border-amber-200/30 pl-3 text-slate-300">{children}</blockquote>,
+        code: ({ children }) => <code className="rounded bg-black/30 px-1 py-0.5 font-mono text-[.9em] text-amber-100">{children}</code>,
+        pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-lg bg-black/35 p-2.5 text-xs leading-5">{children}</pre>,
+        table: ({ children }) => <table className="my-2 w-full border-collapse text-left text-xs">{children}</table>,
+        th: ({ children }) => <th className="border border-white/10 bg-white/5 px-2 py-1 font-semibold text-amber-50">{children}</th>,
+        td: ({ children }) => <td className="border border-white/10 px-2 py-1 align-top">{children}</td>,
+        a: ({ href, children, title }) => href?.startsWith("/nodes/")
+          ? <Link href={href} target="_blank" rel="noreferrer" title={title} className="font-semibold text-amber-200 underline decoration-amber-200/35 underline-offset-2 hover:text-amber-100">{children}</Link>
+          : <a href={href} target="_blank" rel="noreferrer" title={title} className="text-cyan-300 underline decoration-cyan-300/30 underline-offset-2 hover:text-cyan-200">{children}</a>,
+      }}
+    >{content}</ReactMarkdown>
+  </div>;
+}
+
 export function FaustChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
@@ -33,9 +67,22 @@ export function FaustChat() {
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchExistence[]>([]);
   const [selected, setSelected] = useState<SelectedExistence[]>([]);
+  const [existenceLinks, setExistenceLinks] = useState<FaustExistenceLink[]>([]);
   const messageEnd = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (open) messageEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy, open]);
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    void fetch("/api/graph", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => ({ response, body: await response.json() as { nodes?: SearchExistence[] } }))
+      .then(({ response, body }) => {
+        if (response.ok) setExistenceLinks((body.nodes ?? []).map(({ id, name }) => ({ id, name })));
+      }).catch((cause: unknown) => {
+        if (!(cause instanceof DOMException && cause.name === "AbortError")) setExistenceLinks([]);
+      });
+    return () => controller.abort();
+  }, [open]);
   useEffect(() => {
     if (!pickerOpen) return;
     const controller = new AbortController();
@@ -109,7 +156,9 @@ export function FaustChat() {
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-4" aria-live="polite">
       {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
         <div className={`max-w-[90%] rounded-2xl px-3 py-2.5 text-sm leading-6 ${message.role === "user" ? "rounded-br-md bg-amber-100 text-[#17130f]" : "rounded-bl-md border border-amber-100/10 bg-white/[.045] text-slate-200"}`}>
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          {message.role === "assistant"
+            ? <FaustMarkdown content={message.content} existenceLinks={existenceLinks} />
+            : <p className="whitespace-pre-wrap">{message.content}</p>}
           {!!message.existences?.length && <div className="mt-2 flex flex-wrap gap-1 border-t border-black/10 pt-2 text-[10px] text-[#5b4934]">{message.existences.map((item) => <span key={item.id}>检索 · {item.name}</span>)}</div>}
         </div>
       </article>)}
