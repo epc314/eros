@@ -28,7 +28,7 @@ describe("Faust conversation context", () => {
   });
 
   it("keeps the requested greeting and quick reply stable", () => {
-    expect(FAUST_GREETING).toContain("你好，记述的人，我叫浮士德");
+    expect(FAUST_GREETING).toBe("我们从一开始就是朋友，我们有着共同的忧伤、恐惧和根基；即便太阳也是我们所共有的。我们彼此不相识，我们漠然相对，我们笑对我们的知识。你好，记述的人，我叫浮士德。");
     expect(FAUST_QUICK_REPLY).toBe("请给我讲述那些史诗吧。");
   });
 });
