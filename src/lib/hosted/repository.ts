@@ -339,6 +339,23 @@ export async function setHostedDescriptionFeedback(descriptionId: string, voterK
   return { descriptionId, isTrue, trueCount: Number(counts?.trueCount ?? 0), falseCount: Number(counts?.falseCount ?? 0) };
 }
 
+const BACKUP_TABLES = [
+  "worlds", "nodes", "reproductions", "parent_edges", "node_descriptions", "description_feedback", "generated_images",
+] as const;
+
+export async function exportHostedDatabase() {
+  await ensureHostedSchema();
+  const results = await db().batch(BACKUP_TABLES.map((table) => db().prepare(`SELECT * FROM ${table}`)));
+  const tables = Object.fromEntries(BACKUP_TABLES.map((table, index) => [table, results[index].results]));
+  return {
+    format: "eros-d1-backup-v1",
+    exportedAt: new Date().toISOString(),
+    worldId: WORLD_ID,
+    counts: Object.fromEntries(BACKUP_TABLES.map((table) => [table, tables[table].length])),
+    tables,
+  };
+}
+
 export async function getHostedNodeForImage(nodeId: string) {
   await ensureHostedSchema();
   const node = await first<HostedNode>(db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id=?`).bind(nodeId));

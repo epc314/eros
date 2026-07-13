@@ -18,6 +18,7 @@
     "db:migrate": "tsx scripts/ensure-sqlite.ts && prisma migrate dev",
     "db:reset-world": "tsx scripts/reset-world.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "backup:hosted": "tsx scripts/backup-hosted-world.ts",
     "images:backfill": "tsx scripts/backfill-images.ts"
   },
   "dependencies": {
