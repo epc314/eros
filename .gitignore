@@ -12,6 +12,9 @@ test-results
 *.db
 *.db-journal
 .env
+.env.*
+!.env.example
+eros-database-*.json
 public/generated
 services/flux2/.venv
 services/flux2/output
