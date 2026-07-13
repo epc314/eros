@@ -6,6 +6,7 @@ describe("Faust conversation context", () => {
     const details = new Map<string, unknown>([["gaia-id", { existence: { name: "Gaia" }, records: [{ text: "完整记述" }] }]]);
     const messages = composeFaustMessages({
       worldContext: "EROS_WORLD_CONTEXT v1\nworld=Eros",
+      canonicalNames: ["Gaia", "Nyx", "Gaia"],
       conversation: [
         { role: "assistant", content: FAUST_GREETING },
         { role: "user", content: "她是谁？", existenceRefs: ["gaia-id"] },
@@ -15,6 +16,10 @@ describe("Faust conversation context", () => {
     });
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toContain("<eros_world_context>");
+    expect(messages[0].content).toContain("<canonical_existence_names>");
+    expect(messages[0].content).toContain('["Gaia","Nyx"]');
+    expect(messages[0].content).toContain("必须逐字、区分大小写地使用清单中的原名");
+    expect(messages[0].content).toContain("不得把 Gaia 改成“盖亚”或“大地女神”");
     expect(messages[0].content.match(/EROS_WORLD_CONTEXT/g)).toHaveLength(1);
     expect(messages[2].content).toContain("<retrieved_existences>");
     expect(messages[2].content).toContain("完整记述");

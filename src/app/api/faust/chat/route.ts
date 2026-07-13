@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     const detailsByReference = new Map(references.map((reference, index) => [reference, details[index]]));
     const messages = composeFaustMessages({
       worldContext: formatStoryContextText(worldContext),
+      canonicalNames: worldContext.generations.flatMap((group) => group.existences.map((existence) => existence.name)),
       conversation: body.messages,
       detailsByReference,
     });
