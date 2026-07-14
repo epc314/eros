@@ -35,6 +35,7 @@ export function GraphNodeCard({ data, selected }: NodeProps) {
       <div className="mt-2 flex items-center justify-between gap-3"><span className="truncate text-xs font-medium text-cyan-100">{item.primaryEntityZh}</span><span className="shrink-0 text-[11px] text-slate-400">{item.imageCount} 图 · {item.descriptionCount} 记述</span></div>
       <div className="mt-2 border-t border-white/[.06] pt-2 text-right"><code className="hash text-[10px] tracking-[.12em] text-slate-600">{item.genomeHex.slice(0, 8)}</code></div>
     </div>
-    <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-fuchsia-400" />
+    <Handle id="lineage-left" type="source" position={Position.Bottom} style={{ left: "38%" }} className="!h-1.5 !w-1.5 !border-0 !bg-fuchsia-400" />
+    <Handle id="lineage-right" type="source" position={Position.Bottom} style={{ left: "62%" }} className="!h-1.5 !w-1.5 !border-0 !bg-fuchsia-400" />
   </article>;
 }

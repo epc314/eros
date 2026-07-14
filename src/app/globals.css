@@ -11,8 +11,8 @@ button, select { touch-action: manipulation; }
 .glass { background: rgba(14, 19, 31, .86); border: 1px solid rgba(148, 163, 184, .16); backdrop-filter: blur(16px); }
 .hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
 .react-flow__attribution { display: none; }
-.react-flow__edge-text { fill: #94a3b8; font-size: 10px; }
-.react-flow__edge-textbg { fill: #111827; fill-opacity: .9; }
+.react-flow__edge-path { transition: stroke .18s ease, opacity .18s ease; }
+.react-flow__edge:hover .react-flow__edge-path { stroke: #67e8f9 !important; opacity: .96 !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
 @media (max-width: 767px) {
   .react-flow__controls { bottom: 4.5rem !important; left: .75rem !important; }

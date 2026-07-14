@@ -1,17 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Background, Controls, MarkerType, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node } from "@xyflow/react";
+import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node, type NodeTypes } from "@xyflow/react";
 import { ancestorIds, descendantIds } from "@/lib/graph/traversal";
-import { layoutGraph } from "@/lib/graph/layout";
+import { buildPedigreeGraph, layoutGraph } from "@/lib/graph/layout";
 import { decodeGenome } from "@/lib/protocol/token-decoder";
 import { GraphNodeCard, type ErosNodeData } from "./GraphNodeCard";
 import type { GraphPayload } from "./types";
 import { NodeDetailPanel } from "../node/NodeDetailPanel";
 import { ReproductionPanel } from "../reproduction/ReproductionPanel";
 import { TreasureAtlas } from "../treasure/TreasureAtlas";
+import { GraphJunctionNode } from "./GraphJunctionNode";
 
-const nodeTypes = { eros: GraphNodeCard };
+const nodeTypes = { eros: GraphNodeCard, junction: GraphJunctionNode } satisfies NodeTypes;
 
 function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void }) {
   const [payload, setPayload] = useState<GraphPayload | null>(null);
@@ -60,7 +61,7 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
   }, [payload]);
 
   const graph = useMemo(() => {
-    if (!payload) return { nodes: [] as Node<ErosNodeData>[], edges: [] as Edge[] };
+    if (!payload) return { nodes: [] as Node[], edges: [] as Edge[], existenceCount: 0, relationshipCount: 0 };
     let allowed = new Set(payload.nodes.map(({ id }) => id));
     const normalizedQuery = query.trim().toLowerCase();
     if (normalizedQuery) allowed = new Set(payload.nodes.filter((node) => node.name.toLowerCase().includes(normalizedQuery) || node.genomeHex.includes(normalizedQuery) || node.id.includes(normalizedQuery)).map(({ id }) => id));
@@ -71,9 +72,8 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
       const connected = focusMode === "ancestors" ? ancestorIds(selectedId, edges) : descendantIds(selectedId, edges);
       allowed = new Set([...allowed].filter((id) => connected.has(id)));
     }
-    const edges: Edge[] = payload.edges.filter((edge) => allowed.has(edge.parentNodeId) && allowed.has(edge.childNodeId)).map((edge) => ({
-      id: edge.id, source: edge.parentNodeId, target: edge.childNodeId, label: "亲本", type: "smoothstep",
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#64748b" }, style: { stroke: "#475569" },
+    const relations: Edge[] = payload.edges.filter((edge) => allowed.has(edge.parentNodeId) && allowed.has(edge.childNodeId)).map((edge) => ({
+      id: edge.id, source: edge.parentNodeId, target: edge.childNodeId,
     }));
     const nodes: Node<ErosNodeData>[] = payload.nodes.filter((node) => allowed.has(node.id)).map((node) => {
       const summary = entitySummaries.get(node.id)!;
@@ -87,7 +87,8 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
         selectedAs: parentIds[0] === node.id ? "A" : parentIds[1] === node.id ? "B" : undefined,
       } };
     });
-    return { nodes: layoutGraph(nodes, edges), edges };
+    const pedigree = buildPedigreeGraph(layoutGraph(nodes, relations), relations);
+    return { ...pedigree, existenceCount: nodes.length, relationshipCount: relations.length };
   }, [payload, query, generation, rootsOnly, selectedId, focusMode, parentIds, nodeById, entitySummaries]);
 
   function selectAsParent(id: string) {
@@ -111,17 +112,17 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
           <button onClick={() => fitView({ duration: 500, padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 })} className="glass min-h-11 shrink-0 rounded-xl px-3 text-sm text-slate-300">适应画布</button>
         </div>
       </div>
-      <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
+      <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { if (node.type === "junction") return; setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} edgesFocusable={false} edgesReconnectable={false} elevateEdgesOnSelect={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
         <Background color="#253044" gap={26} size={1} />
         <Controls
           position={isMobile ? "bottom-left" : "bottom-right"}
           showInteractive={false}
           style={isMobile ? { bottom: "4.75rem" } : { right: "11rem" }}
         />
-        {!isMobile && <MiniMap position="bottom-right" pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(node) => (node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
+        {!isMobile && <MiniMap position="bottom-right" pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(node) => (node.type === "junction" ? "#334155" : node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
       </ReactFlow>
       <button type="button" onClick={onOpenTreasureAtlas} className="absolute bottom-3 left-3 z-20 min-h-11 rounded-xl border border-emerald-300/25 bg-slate-950/90 px-3 text-xs font-semibold text-emerald-200 shadow-xl backdrop-blur-xl">宝物图鉴</button>
-      <div className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs text-slate-400 sm:block">{graph.nodes.length} 存在 · {graph.edges.length} 亲本边 · 点击存在查看详情</div>
+      <div className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs text-slate-400 sm:block">{graph.existenceCount} 存在 · {graph.relationshipCount} 条谱系关系 · 点击存在查看详情</div>
       <button type="button" onClick={() => { setSelectedId(null); setMobilePanelOpen(true); }} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-3 z-20 min-h-12 rounded-full bg-gradient-to-r from-fuchsia-500 to-cyan-500 px-5 text-sm font-semibold text-white shadow-xl shadow-fuchsia-950/40 md:hidden">繁衍 / 创世{parentIds.filter(Boolean).length ? ` · ${parentIds.filter(Boolean).length}/2` : ""}</button>
     </section>
     <ReproductionPanel nodes={payload.nodes} parentIds={parentIds} setParentIds={setParentIds} mobileOpen={mobilePanelOpen} onMobileClose={() => setMobilePanelOpen(false)} onCreated={(id) => { setSelectedId(id); setMobilePanelOpen(false); void load(); }} />
