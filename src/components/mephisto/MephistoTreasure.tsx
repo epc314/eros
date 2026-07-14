@@ -10,7 +10,7 @@ interface SearchAttempt { attempt: number; hashHex: string; closest: Match | nul
 interface SearchResult { timestampMs: string; attempts: SearchAttempt[]; success: boolean; finalHashHex: string; matches: Match[] }
 interface TreasureImage { id: string; imageUrl?: string | null; thumbnailUrl?: string | null; width?: number | null; height?: number | null }
 interface TreasureCandidate {
-  id: string; name: string; ownerName: string; ownerNodeId: string; subjectName: string; subjectGroup: string;
+  id: string; name: string; ownerName: string; ownerNodeId: string; protocolVersion?: string; subjectName: string; subjectGroup: string;
   searchHashHex: string; matchScore: number; status: "PENDING" | "COLLECTED"; tokens: TreasureToken[];
   recorderName?: string | null;
 }
@@ -117,7 +117,7 @@ export function MephistoTreasure() {
         <h3 className="text-xs font-semibold text-emerald-100">命运匹配</h3>
         <div className="mt-2 space-y-2">{search.attempts.map((attempt) => <div key={attempt.attempt} className="text-xs leading-5 text-slate-400">
           <div className="flex items-center justify-between"><span>第 {attempt.attempt} 次</span><code className="text-[10px] text-slate-600">{attempt.hashHex.slice(0, 12)}…</code></div>
-          {attempt.matches.length ? <p className="text-emerald-300">匹配成功 · {attempt.matches.length} 个存在越过 40 bit</p> : <p>未越过阈值 · 最近的是 <Link className="text-cyan-300" href={`/nodes/${attempt.closest?.id}`}>{attempt.closest?.name ?? "无"}</Link>{attempt.closest ? `（${attempt.closest.score} bit）` : ""}</p>}
+          {attempt.matches.length ? <p className="text-emerald-300">匹配成功 · {attempt.matches.length} 个存在超过 76 个相同 bit</p> : <p>未越过阈值 · 最近的是 <Link className="text-cyan-300" href={`/nodes/${attempt.closest?.id}`}>{attempt.closest?.name ?? "无"}</Link>{attempt.closest ? `（${attempt.closest.score}/128 bit 相同）` : ""}</p>}
         </div>)}</div>
       </section>}
 
@@ -126,14 +126,14 @@ export function MephistoTreasure() {
 
       {phase === "choosing" && search?.success && <section>
         <h3 className="text-sm font-semibold text-emerald-50">选择一条与咒语相合的命运</h3>
-        <div className="mt-2 space-y-2">{search.matches.map((match) => <button type="button" key={match.id} onClick={() => void generate(match, search, activeSpell)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-200/15 bg-emerald-100/5 px-3 text-left text-sm hover:bg-emerald-100/10"><span>{match.name}</span><span className="text-xs text-emerald-300">{match.score} bit</span></button>)}</div>
+        <div className="mt-2 space-y-2">{search.matches.map((match) => <button type="button" key={match.id} onClick={() => void generate(match, search, activeSpell)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-200/15 bg-emerald-100/5 px-3 text-left text-sm hover:bg-emerald-100/10"><span>{match.name}</span><span className="text-xs text-emerald-300">{match.score}/128 bit 相同</span></button>)}</div>
       </section>}
-      {phase === "choosing" && search && !search.success && <p className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-sm leading-6 text-amber-100">三次戏法都未能越过 40 bit。换一句咒语，或让时间流逝片刻再试。</p>}
+      {phase === "choosing" && search && !search.success && <p className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-sm leading-6 text-amber-100">三次戏法都未能找到超过 76 个相同 bit 的存在。换一句咒语，或让时间流逝片刻再试。</p>}
 
       {candidate && (phase === "candidate" || phase === "collected") && <section className="overflow-hidden rounded-2xl border border-emerald-100/15 bg-black/25">
         {(images[0]?.thumbnailUrl || images[0]?.imageUrl) && <img src={images[0].thumbnailUrl ?? images[0].imageUrl ?? ""} alt={candidate.name} width={512} height={320} className="h-auto w-full bg-black object-contain" />}
         <div className="p-4"><p className="text-xs text-emerald-300">{candidate.subjectGroup}</p><h3 className="mt-1 font-serif text-xl text-emerald-50">{candidate.name}</h3>
-          <p className="mt-2 text-xs text-slate-500">持有存在 · <Link className="text-cyan-300" href={`/nodes/${candidate.ownerNodeId}`}>{candidate.ownerName}</Link> · 相合 {candidate.matchScore} bit</p>
+          <p className="mt-2 text-xs text-slate-500">持有存在 · <Link className="text-cyan-300" href={`/nodes/${candidate.ownerNodeId}`}>{candidate.ownerName}</Link> · {candidate.protocolVersion === "eros-treasure-v1" ? `共同为 1：${candidate.matchScore} bit` : `相同：${candidate.matchScore}/128 bit`}</p>
           <details className="mt-3 rounded-xl border border-white/10 p-3"><summary className="cursor-pointer text-xs text-emerald-200">查看 128-bit 与确定性特征</summary><p className="hash mt-2 break-all text-[10px] text-slate-600">{candidate.searchHashHex}</p><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">{candidate.tokens.map((token) => <div key={token.position} className="contents"><dt className="text-slate-500">{token.familyZh}</dt><dd className="text-slate-300">{token.phraseZh}</dd></div>)}</dl></details>
           {phase === "candidate" ? <div className="mt-4"><input value={recorderName} onChange={(event) => setRecorderName(event.target.value)} maxLength={64} placeholder="记述人的名字（留空为匿名）" aria-label="记述人的名字" className="w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm outline-none focus:border-emerald-200/30"/><button type="button" onClick={() => void collect()} className="mt-2 min-h-11 w-full rounded-xl bg-emerald-100 px-4 text-sm font-semibold text-[#0b120f]">收录</button></div>
             : <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3 text-sm text-emerald-200">已收入宝物图鉴 · <Link className="underline" href={`/treasures/${candidate.id}`}>打开详细记录</Link></div>}

@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const owner = graph.nodes.find(({ id }) => id === input.ownerNodeId)!;
     const decoded = decodeTreasure(search.finalHashHex);
     const name = createTreasureName(owner.name, decoded.subjectName);
-    const exactPrompt = buildTreasureImagePrompt(decoded.subjectName, owner.name, decoded.tokens);
+    const exactPrompt = buildTreasureImagePrompt(decoded.subjectNameEn, decoded.tokens);
     const attempt = search.attempts.at(-1)?.attempt ?? 1;
     const candidate = await createOrGetTreasureCandidate({
       ownerNodeId: owner.id,

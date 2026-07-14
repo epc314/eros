@@ -2,8 +2,10 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "../protocol/hex";
 import { EROS_VISUAL_STYLE } from "../protocol/prompt";
 
-export const TREASURE_PROTOCOL_VERSION = "eros-treasure-v1";
-export const TREASURE_MATCH_THRESHOLD = 40;
+export const TREASURE_PROTOCOL_VERSION = "eros-treasure-v2";
+// A random 128-bit XNOR score is centered on 64. Requiring >76 preserves roughly
+// the rarity of the former balanced AND rule (>40 out of about 64 one-bits).
+export const TREASURE_MATCH_THRESHOLD = 76;
 export const TREASURE_MAX_ATTEMPTS = 3;
 
 export const MEPHISTO_GREETING = "我是永远否定的精灵，是总想行恶却行了善的力量的一部分。发生的一切终将毁灭，不如借我的戏法神游八方。我是梅菲斯特，告诉我你的咒语，借你我的魔力搜罗万千宝物";
@@ -61,6 +63,61 @@ export const TREASURE_SUBJECT_GROUPS = [
 
 export const TREASURE_SUBJECTS = TREASURE_SUBJECT_GROUPS.flatMap((group) => [...group.subjects]);
 if (TREASURE_SUBJECTS.length !== 256) throw new Error("Treasure subject vocabulary must contain exactly 256 entries");
+
+export const TREASURE_SUBJECT_GROUPS_EN = [
+  { name: "Gemstones and Jewels", subjects: [
+    "Jeweled Orb", "Pearl", "Pearl Strand", "Jeweled Crown", "Crystal Ball", "Crystal Pillar", "Crystal Cluster", "Crystal Shard",
+    "Rough Gemstone", "Faceted Gemstone", "Carved Gemstone", "Signet Gemstone", "Amber", "Agate", "Jade", "Coral Bead",
+    "Cat's-eye Gemstone", "Opal", "Lapis Lazuli", "Turquoise", "Amethyst", "Garnet", "Sapphire", "Ruby",
+    "Emerald", "Moonstone", "Obsidian", "Onyx", "Mother-of-pearl Plaque", "Gemstone Rose", "Crystal Teardrop", "Gemstone Disc",
+  ] },
+  { name: "Precious Metals and Cast Treasures", subjects: [
+    "Gold Ingot", "Silver Ingot", "Gold Coin", "Silver Coin", "Ancient Coin", "Gold Bead", "Silver Bead", "Gold Leaf",
+    "Silver Leaf", "Gold Thread", "Silver Thread", "Gold Chain", "Silver Chain", "Gold Ring", "Silver Ring", "Gold Platter",
+    "Silver Platter", "Gold Goblet", "Silver Goblet", "Gold Bowl", "Silver Bowl", "Gold Casket", "Silver Casket", "Gold Statuette",
+    "Silver Statuette", "Golden Mask", "Silver Mask", "Gold Badge", "Silver Badge", "Metal Sacred Medallion", "Cast-gold Relief", "Silver-inlaid Panel",
+  ] },
+  { name: "Regalia and Adornments", subjects: [
+    "Royal Crown", "Diadem", "Laurel Wreath", "Circlet", "Forehead Diadem", "Jeweled Hairnet", "Earring", "Drop Earring",
+    "Necklace", "Torc", "Pendant", "Protective Amulet", "Brooch", "Cloak Pin", "Ring", "Signet Ring",
+    "Bracelet", "Armlet", "Anklet", "Waist Chain", "Jeweled Belt", "Ornate Buckle", "Shoulder Ornament", "Shawl Clasp",
+    "Ornate Cloak", "Embroidered Robe", "Silk Veil", "Jeweled Gloves", "Ornamented Boots", "Ritual Mask", "Feathered Headdress", "Metal Torc",
+  ] },
+  { name: "Vessels and Ritual Treasures", subjects: [
+    "Treasure Chest", "Jewel Casket", "Jewelry Box", "Reliquary", "Sacred Chalice", "Goblet", "Horn Cup", "Two-handled Cup",
+    "Wine Jug", "Water Jug", "Amphora", "Slender-necked Bottle", "Unguent Bottle", "Incense Burner", "Brazier", "Candlestick",
+    "Oil Lamp", "Lantern", "Jeweled Mirror", "Offering Bowl", "Libation Tray", "Offering Platter", "Ritual Bell", "Silver Bell",
+    "Altar Box", "Holy Water Flask", "Funerary Urn", "Jeweled Jar", "Sealed Ceramic Jar", "Inscribed Vase", "Carved Wooden Box", "Iron Lockbox",
+  ] },
+  { name: "Antiquities and Collectibles", subjects: [
+    "Ancient Mirror", "Ancient Coin", "Ancient Seal", "Ancient Lock", "Ancient Key", "Ancient Clock", "Ancient Lamp", "Ancient Bottle",
+    "Ancient Jar", "Ancient Casket", "Lyre", "Kithara", "Panpipes", "Horn", "Hand Drum", "Ancient Game Board",
+    "Parchment Scroll", "Clay Tablet", "Handwritten Codex", "Illuminated Manuscript", "Ancient Map", "Astral Chart", "Genealogical Scroll", "Stone Inscription",
+    "Bronze Plaque", "Broken Stele", "Wax Tablet", "Cylinder Seal", "Marble Statue", "Bronze Statue", "Ancient Mask", "Temple Fragment",
+  ] },
+  { name: "Weapons and Armor", subjects: [
+    "Longsword", "Shortsword", "Broadsword", "Dagger", "Spear", "Javelin", "Battle Axe", "Double-headed Axe",
+    "War Hammer", "Scepter Mace", "Longbow", "Shortbow", "Crossbow", "Quiver", "Arrow Bundle", "Sling",
+    "Round Shield", "Long Shield", "Tower Shield", "Helmet", "Winged Helmet", "Visor", "Breastplate", "Chainmail",
+    "Scale Armor", "Vambrace", "Gauntlet", "Leg Armor", "Greave", "Heart Guard", "Scabbard", "Ceremonial Weapon",
+  ] },
+  { name: "Natural Relics and Rare Materials", subjects: [
+    "Curious Stone", "Crystal Geode", "Mineral Crystal", "Gold Dust", "Silver Dust", "Lodestone", "Meteorite", "Salt Crystal",
+    "Fossil", "Colossal Beast Bone", "Beast Tooth", "Tusk", "Beast Horn", "Antler", "Giant Carapace", "Scale",
+    "Colorful Feather", "Rare Hide", "White Pelt", "Mother-of-pearl Shell", "Giant Seashell", "Conch", "Coral Branch", "Insect-bearing Amber",
+    "Aromatic Wood", "Ebony", "Olive Wood", "Oak Heartwood", "Burl", "Twisted Root", "Giant Seed", "Petrified Wood",
+  ] },
+  { name: "Curiosities, Scepters, and Mechanisms", subjects: [
+    "Scepter", "Wand", "Ritual Staff", "Shepherd's Crook", "Orb", "Royal Orb", "Compass", "Astrolabe",
+    "Sundial", "Hourglass", "Water Clock", "Pocket Watch", "Music Box", "Puzzle Box", "Hidden-compartment Casket", "Cipher Disc",
+    "Puzzle Lock", "Clockwork Device", "Mechanical Bird", "Mechanical Beast", "Automaton", "Mechanical Sphere", "Kaleidoscope", "Telescope",
+    "Monocular", "Magnifying Glass", "Alchemical Crucible", "Precision Balance", "Divination Dice", "Divination Tiles", "Spindle of Fate", "Ritual Horn",
+  ] },
+] as const;
+
+export const TREASURE_SUBJECTS_EN = TREASURE_SUBJECT_GROUPS_EN.flatMap((group) => [...group.subjects]);
+if (TREASURE_SUBJECT_GROUPS_EN.length !== TREASURE_SUBJECT_GROUPS.length || TREASURE_SUBJECT_GROUPS_EN.some((group, index) => group.subjects.length !== TREASURE_SUBJECT_GROUPS[index].subjects.length) || TREASURE_SUBJECTS_EN.length !== 256)
+  throw new Error("English treasure subject vocabulary must mirror all 256 Chinese entries");
 
 const intensityZh = ["含蓄的", "清澈的", "柔和的", "明亮的", "沉静的", "庄严的", "典雅的", "精致的", "古朴的", "华贵的", "神秘的", "神圣的", "恒久的", "梦幻的", "宏伟的", "超凡的"] as const;
 const intensityEn = ["subtle", "clear", "gentle", "luminous", "serene", "solemn", "elegant", "refined", "antique", "regal", "mysterious", "sacred", "timeless", "dreamlike", "monumental", "otherworldly"] as const;
@@ -141,6 +198,17 @@ export function intersectionScore(searchHashHex: string, featureHex: string): nu
   return score;
 }
 
+export function xnorSimilarityScore(searchHashHex: string, featureHex: string): number {
+  const left = hexToBytes(searchHashHex, 16);
+  const right = hexToBytes(featureHex, 16);
+  let differentBits = 0;
+  for (let index = 0; index < 16; index += 1) {
+    let value = left[index] ^ right[index];
+    while (value) { differentBits += value & 1; value >>>= 1; }
+  }
+  return 128 - differentBits;
+}
+
 export function searchTreasures(spell: string, timestampMs: string | number | bigint, nodes: TreasureMatchNode[]): TreasureSearchResult {
   const timestamp = String(timestampMs);
   let hashHex = hash128(`${spell}｜${timestamp}`);
@@ -148,7 +216,7 @@ export function searchTreasures(spell: string, timestampMs: string | number | bi
   for (let attempt = 1; attempt <= TREASURE_MAX_ATTEMPTS; attempt += 1) {
     const ranked = nodes.map((node) => {
       const featureHex = node.featureHex ?? createExistenceFeature(node.genomeHex);
-      return { id: node.id, name: node.name, featureHex, score: intersectionScore(hashHex, featureHex) };
+      return { id: node.id, name: node.name, featureHex, score: xnorSimilarityScore(hashHex, featureHex) };
     }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     const matches = ranked.filter((item) => item.score > TREASURE_MATCH_THRESHOLD);
     attempts.push({ attempt, hashHex, closest: ranked[0] ?? null, matches });
@@ -158,7 +226,7 @@ export function searchTreasures(spell: string, timestampMs: string | number | bi
   return { timestampMs: timestamp, attempts, success: false, finalHashHex: hashHex, matches: [] };
 }
 
-export function decodeTreasure(hashHex: string): { subjectIndex: number; subjectName: string; subjectGroup: string; tokens: TreasureToken[] } {
+export function decodeTreasure(hashHex: string): { subjectIndex: number; subjectName: string; subjectNameEn: string; subjectGroup: string; subjectGroupEn: string; tokens: TreasureToken[] } {
   const bytes = hexToBytes(hashHex, 16);
   const subjectIndex = bytes[0];
   const group = TREASURE_SUBJECT_GROUPS[Math.floor(subjectIndex / 32)];
@@ -175,11 +243,18 @@ export function decodeTreasure(hashHex: string): { subjectIndex: number; subject
       phrase: `${intensityEn[modifierIndex]} ${enValues[valueIndex]}`,
     };
   });
-  return { subjectIndex, subjectName: TREASURE_SUBJECTS[subjectIndex], subjectGroup: group.name, tokens };
+  return {
+    subjectIndex,
+    subjectName: TREASURE_SUBJECTS[subjectIndex],
+    subjectNameEn: TREASURE_SUBJECTS_EN[subjectIndex],
+    subjectGroup: group.name,
+    subjectGroupEn: TREASURE_SUBJECT_GROUPS_EN[Math.floor(subjectIndex / 32)].name,
+    tokens,
+  };
 }
 
-export function buildTreasureImagePrompt(subjectName: string, ownerName: string, tokens: TreasureToken[]): string {
-  return `Generate a single collectible mythic treasure artifact named “${ownerName} 的 ${subjectName}”.\n\nUnified visual style:\n${EROS_VISUAL_STYLE}\n\nTreasure subject:\n- ${subjectName}, clearly recognizable as the central artifact\n\nDeterministic attributes:\n${tokens.map((token) => `- ${token.family}: ${token.phrase}`).join("\n")}\n\nShow only one coherent treasure as the unmistakable focus. Use an uncluttered museum-like composition and preserve all attributes as tasteful properties of the artifact. Do not depict the owner as a character. Do not add text, captions, labels, logos, signatures, or watermarks.`;
+export function buildTreasureImagePrompt(subjectNameEn: string, tokens: TreasureToken[]): string {
+  return `Generate a single collectible mythic treasure artifact: “${subjectNameEn}”.\n\nUnified visual style:\n${EROS_VISUAL_STYLE}\n\nTreasure subject:\n- ${subjectNameEn}, clearly recognizable as the central artifact\n\nDeterministic attributes:\n${tokens.map((token) => `- ${token.family}: ${token.phrase}`).join("\n")}\n\nShow only one coherent treasure as the unmistakable focus. Use an uncluttered museum-like composition and preserve all attributes as tasteful properties of the artifact. Do not depict any owner or bearer as a character. Do not add text, captions, labels, logos, signatures, or watermarks.`;
 }
 
 export function createTreasureName(ownerName: string, subjectName: string): string {
