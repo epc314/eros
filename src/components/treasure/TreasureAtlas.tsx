@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 interface AtlasTreasure {
   id: string; name: string; ownerName: string; ownerNodeId: string; subjectName: string; subjectGroup: string;
   searchHashHex: string;
-  recorderName?: string | null; descriptions: number; imageCount: number; collectedAt?: string | null;
+  title?: string | null; recorderName?: string | null; descriptions: number; imageCount: number; collectedAt?: string | null;
   images: Array<{ thumbnailUrl?: string | null; imageUrl?: string | null }>;
 }
 
@@ -30,14 +30,14 @@ export function TreasureAtlas({ onBack }: { onBack?: () => void }) {
   const visible = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return treasures;
-    return treasures.filter((item) => item.name.toLowerCase().includes(normalized) || item.ownerName.toLowerCase().includes(normalized) || (item.searchHashHex ?? "").startsWith(normalized) || item.id.startsWith(normalized));
+    return treasures.filter((item) => item.name.toLowerCase().includes(normalized) || item.title?.toLowerCase().includes(normalized) || item.ownerName.toLowerCase().includes(normalized) || (item.searchHashHex ?? "").startsWith(normalized) || item.id.startsWith(normalized));
   }, [query, treasures]);
 
   return <main className="h-[100dvh] overflow-y-auto px-3 pb-24 pt-[76px] sm:px-5">
     <div className="mx-auto max-w-7xl">
       <div className="glass sticky top-[76px] z-10 rounded-2xl p-4 sm:flex sm:items-center sm:justify-between sm:gap-5">
         <div><p className="text-xs uppercase tracking-[.2em] text-emerald-300">Mephisto collection</p><h1 className="mt-1 font-serif text-2xl text-white sm:text-3xl">宝物图鉴</h1><p className="mt-1 text-xs text-slate-500">{treasures.length} 件已被寻得并收录的宝物</p></div>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索宝物、持有存在或 Hash 前缀" aria-label="搜索宝物" className="mt-3 min-h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm outline-none focus:border-emerald-300/30 sm:mt-0 sm:max-w-md" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索宝物、称号、持有存在或 Hash 前缀" aria-label="搜索宝物" className="mt-3 min-h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm outline-none focus:border-emerald-300/30 sm:mt-0 sm:max-w-md" />
       </div>
       {loading && <p className="py-20 text-center text-slate-500">正在翻阅宝物图鉴……</p>}
       {error && <p className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/5 p-4 text-red-200">{error}</p>}
@@ -46,7 +46,7 @@ export function TreasureAtlas({ onBack }: { onBack?: () => void }) {
         const image = treasure.images[0]?.thumbnailUrl ?? treasure.images[0]?.imageUrl;
         return <Link href={`/treasures/${treasure.id}`} key={treasure.id} className="glass group overflow-hidden rounded-2xl border border-white/10 transition hover:-translate-y-1 hover:border-emerald-300/30">
           <div className="aspect-[4/3] overflow-hidden bg-black">{image ? <img src={image} alt={treasure.name} width={512} height={320} loading="lazy" decoding="async" className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]" /> : <div className="grid h-full place-items-center text-3xl text-slate-700">◇</div>}</div>
-          <div className="p-3"><p className="line-clamp-2 font-serif text-base leading-5 text-slate-100">{treasure.name}</p><p className="mt-2 truncate text-[11px] text-cyan-300">持有 · {treasure.ownerName}</p><p className="mt-1 text-[10px] text-slate-600">{treasure.imageCount} 图 · {treasure.descriptions} 记述</p><div className="mt-2 border-t border-white/[.06] pt-2 text-right"><code className="hash text-[10px] tracking-[.12em] text-slate-600">{(treasure.searchHashHex ?? "").slice(0, 8)}</code></div></div>
+          <div className="p-3"><p className="line-clamp-2 font-serif text-base leading-5 text-slate-100">{treasure.name}</p><p className="mt-1 min-h-4 truncate text-[11px] italic text-emerald-100/55">{treasure.title ?? ""}</p><p className="mt-2 truncate text-[11px] text-cyan-300">持有 · {treasure.ownerName}</p><p className="mt-1 text-[10px] text-slate-600">{treasure.imageCount} 图 · {treasure.descriptions} 记述</p><div className="mt-2 border-t border-white/[.06] pt-2 text-right"><code className="hash text-[10px] tracking-[.12em] text-slate-600">{(treasure.searchHashHex ?? "").slice(0, 8)}</code></div></div>
         </Link>;
       })}</div>
     </div>

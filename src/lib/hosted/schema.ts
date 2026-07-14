@@ -57,7 +57,7 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS generated_images_node_created_idx ON generated_images(node_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS treasures (
     id TEXT PRIMARY KEY, world_id TEXT NOT NULL, owner_node_id TEXT NOT NULL,
-    protocol_version TEXT NOT NULL, name TEXT NOT NULL, subject_index INTEGER NOT NULL,
+    protocol_version TEXT NOT NULL, name TEXT NOT NULL, title TEXT, subject_index INTEGER NOT NULL,
     subject_name TEXT NOT NULL, subject_group TEXT NOT NULL, instance_number INTEGER NOT NULL DEFAULT 1,
     search_timestamp_ms TEXT NOT NULL,
     search_attempt INTEGER NOT NULL, search_hash_hex TEXT NOT NULL, match_score INTEGER NOT NULL,

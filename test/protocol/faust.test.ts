@@ -7,8 +7,8 @@ describe("Faust conversation context", () => {
     const messages = composeFaustMessages({
       worldContext: "EROS_WORLD_CONTEXT v1\nworld=Eros",
       canonicalNames: ["Gaia", "Nyx", "Gaia"],
-      canonicalTreasureNames: ["【Gaia】的【宝珠】"],
-      treasureContext: "宝物：【Gaia】的【宝珠】；持有存在：Gaia",
+      canonicalTreasureNames: ["Gaia 的 宝珠"],
+      treasureContext: "宝物：Gaia 的 宝珠；持有存在：Gaia",
       conversation: [
         { role: "assistant", content: FAUST_GREETING },
         { role: "user", content: "她是谁？", existenceRefs: ["gaia-id"] },
@@ -21,7 +21,7 @@ describe("Faust conversation context", () => {
     expect(messages[0].content).toContain("<canonical_existence_names>");
     expect(messages[0].content).toContain("<canonical_treasure_names>");
     expect(messages[0].content).toContain("<eros_treasure_context>");
-    expect(messages[0].content).toContain("【Gaia】的【宝珠】");
+    expect(messages[0].content).toContain("Gaia 的 宝珠");
     expect(messages[0].content).toContain('["Gaia","Nyx"]');
     expect(messages[0].content).toContain("必须逐字、区分大小写地使用清单中的原名");
     expect(messages[0].content).toContain("不得把 Gaia 改成“盖亚”或“大地女神”");

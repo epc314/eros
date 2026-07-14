@@ -19,6 +19,7 @@ export function MephistoTreasure() {
   const [open, setOpen] = useState(false);
   const [hiddenByOtherWindow, setHiddenByOtherWindow] = useState(false);
   const [spell, setSpell] = useState("");
+  const [activeSpell, setActiveSpell] = useState("");
   const [search, setSearch] = useState<SearchResult | null>(null);
   const [candidate, setCandidate] = useState<TreasureCandidate | null>(null);
   const [images, setImages] = useState<TreasureImage[]>([]);
@@ -45,7 +46,7 @@ export function MephistoTreasure() {
   }, []);
 
   function reset() {
-    setSpell(""); setSearch(null); setCandidate(null); setImages([]); setRecorderName(""); setPhase("idle"); setError("");
+    setSpell(""); setActiveSpell(""); setSearch(null); setCandidate(null); setImages([]); setRecorderName(""); setPhase("idle"); setError("");
   }
 
   async function generate(owner: Match, currentSearch: SearchResult, currentSpell: string) {
@@ -65,6 +66,7 @@ export function MephistoTreasure() {
     event.preventDefault();
     const currentSpell = spell.trim();
     if (!currentSpell || phase === "searching" || phase === "generating") return;
+    setActiveSpell(currentSpell); setSpell("");
     setSearch(null); setCandidate(null); setImages([]); setError(""); setPhase("searching");
     try {
       const response = await fetch("/api/treasures/search", {
@@ -120,11 +122,11 @@ export function MephistoTreasure() {
       </section>}
 
       {phase === "searching" && <p className="animate-pulse rounded-xl border border-emerald-100/10 p-3 text-sm text-emerald-100/60">正在把咒语和时间投入命运的骰盅……</p>}
-      {phase === "generating" && <p className="animate-pulse rounded-xl border border-emerald-100/10 p-3 text-sm leading-6 text-emerald-100/60">匹配已完成，正在调用 FLUX.2 Klein 9B Preview 显现宝物。这可能需要一两分钟……</p>}
+      {phase === "generating" && <p className="animate-pulse rounded-xl border border-emerald-100/10 p-3 text-sm leading-6 text-emerald-100/60">匹配已完成，正在显现宝物。这可能需要一两分钟……</p>}
 
       {phase === "choosing" && search?.success && <section>
         <h3 className="text-sm font-semibold text-emerald-50">选择一条与咒语相合的命运</h3>
-        <div className="mt-2 space-y-2">{search.matches.map((match) => <button type="button" key={match.id} onClick={() => void generate(match, search, spell.trim())} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-200/15 bg-emerald-100/5 px-3 text-left text-sm hover:bg-emerald-100/10"><span>{match.name}</span><span className="text-xs text-emerald-300">{match.score} bit</span></button>)}</div>
+        <div className="mt-2 space-y-2">{search.matches.map((match) => <button type="button" key={match.id} onClick={() => void generate(match, search, activeSpell)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-200/15 bg-emerald-100/5 px-3 text-left text-sm hover:bg-emerald-100/10"><span>{match.name}</span><span className="text-xs text-emerald-300">{match.score} bit</span></button>)}</div>
       </section>}
       {phase === "choosing" && search && !search.success && <p className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-sm leading-6 text-amber-100">三次戏法都未能越过 40 bit。换一句咒语，或让时间流逝片刻再试。</p>}
 

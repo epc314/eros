@@ -13,6 +13,7 @@ export interface HostedTreasure {
   ownerName: string;
   protocolVersion: string;
   name: string;
+  title: string | null;
   subjectIndex: number;
   subjectName: string;
   subjectGroup: string;
@@ -70,7 +71,7 @@ async function all<T>(query: D1PreparedStatement): Promise<T[]> { return (await 
 const newId = () => crypto.randomUUID();
 
 const treasureColumns = `t.id,t.world_id AS worldId,t.owner_node_id AS ownerNodeId,n.name AS ownerName,
-  t.protocol_version AS protocolVersion,t.name,t.subject_index AS subjectIndex,t.subject_name AS subjectName,
+  t.protocol_version AS protocolVersion,t.name,t.title,t.subject_index AS subjectIndex,t.subject_name AS subjectName,
   t.subject_group AS subjectGroup,t.instance_number AS instanceNumber,t.search_timestamp_ms AS searchTimestampMs,t.search_attempt AS searchAttempt,
   t.search_hash_hex AS searchHashHex,t.match_score AS matchScore,t.owner_feature_hex AS ownerFeatureHex,
   t.tokens_json AS tokensJson,t.exact_prompt AS exactPrompt,t.recorder_name AS recorderName,
@@ -152,8 +153,8 @@ export async function getTreasureInternal(id: string): Promise<HostedTreasure | 
 export async function listCollectedTreasures(query?: string) {
   await ensureHostedSchema();
   const normalized = query?.trim();
-  const where = normalized ? "AND (t.name LIKE ? OR n.name LIKE ? OR t.search_hash_hex LIKE ? OR t.id LIKE ?)" : "";
-  const values = normalized ? [`%${normalized}%`, `%${normalized}%`, `${normalized.toLowerCase()}%`, `${normalized.toLowerCase()}%`] : [];
+  const where = normalized ? "AND (t.name LIKE ? OR t.title LIKE ? OR n.name LIKE ? OR t.search_hash_hex LIKE ? OR t.id LIKE ?)" : "";
+  const values = normalized ? [`%${normalized}%`, `%${normalized}%`, `%${normalized}%`, `${normalized.toLowerCase()}%`, `${normalized.toLowerCase()}%`] : [];
   const rows = await all<HostedTreasure & { descriptionCount: number; imageCount: number }>(db().prepare(`SELECT ${treasureColumns},
     (SELECT COUNT(*) FROM treasure_descriptions d WHERE d.treasure_id=t.id AND d.status='VISIBLE') AS descriptionCount,
     (SELECT COUNT(*) FROM treasure_images i WHERE i.treasure_id=t.id AND i.status='COMPLETED') AS imageCount
@@ -167,6 +168,7 @@ export async function listCollectedTreasures(query?: string) {
   return rows.map(({ descriptionCount, imageCount, ...treasure }) => ({
     id: treasure.id,
     name: treasure.name,
+    title: treasure.title,
     ownerNodeId: treasure.ownerNodeId,
     ownerName: treasure.ownerName,
     subjectIndex: treasure.subjectIndex,
@@ -194,6 +196,7 @@ export async function listNodeTreasures(nodeId: string) {
   return rows.map(({ descriptionCount, imageCount, ...treasure }) => ({
     id: treasure.id,
     name: treasure.name,
+    title: treasure.title,
     ownerNodeId: treasure.ownerNodeId,
     ownerName: treasure.ownerName,
     subjectIndex: treasure.subjectIndex,
@@ -241,12 +244,21 @@ export async function collectTreasure(id: string, recorderName?: string) {
   const recorder = recorderName?.trim() || "匿名";
   const collectedAt = new Date().toISOString();
   const descriptionId = `treasure-discovery:${id}`;
-  const body = `${treasure.name}由${recorder}从${treasure.ownerName}的命运中寻得，并收入宝物图鉴。`;
+  const body = `${treasure.name} 由 ${recorder} 从 ${treasure.ownerName} 的命运中寻得，并收入宝物图鉴。`;
   await db().batch([
     db().prepare("UPDATE treasures SET status='COLLECTED',recorder_name=?,collected_at=? WHERE id=? AND status='PENDING'").bind(recorder, collectedAt, id),
     db().prepare(`INSERT OR IGNORE INTO treasure_descriptions (id,treasure_id,body,author_label,status,kind,created_at)
       VALUES (?,?,?,?, 'VISIBLE','DISCOVERY',?)`).bind(descriptionId, id, body, recorder, collectedAt),
   ]);
+  return getCollectedTreasure(id);
+}
+
+export async function updateTreasureTitle(id: string, title: string) {
+  await ensureHostedSchema();
+  if (!await first(db().prepare("SELECT id FROM treasures WHERE id=? AND status='COLLECTED'").bind(id)))
+    throw new ApiFailure("TREASURE_NOT_FOUND", "宝物不存在或尚未被收录。", 404);
+  const normalized = title.trim();
+  await db().prepare("UPDATE treasures SET title=? WHERE id=?").bind(normalized || null, id).run();
   return getCollectedTreasure(id);
 }
 
@@ -326,6 +338,7 @@ export async function hostedTreasureContext(): Promise<{ text: string; names: st
     names: details.map(({ treasure }) => treasure.name),
     text: details.map(({ treasure, descriptions }) => [
       `宝物：${treasure.name} [${treasure.id}]`,
+      ...(treasure.title ? [`称号：${treasure.title}`] : []),
       `主体：${treasure.subjectName}；类别：${treasure.subjectGroup}；持有存在：${treasure.ownerName} [${treasure.ownerNodeId}]；记述人：${treasure.recorderName ?? "匿名"}`,
       `属性：${treasure.tokens.map((token) => `${token.familyZh}=${token.phraseZh}`).join("；")}`,
       "记述：",

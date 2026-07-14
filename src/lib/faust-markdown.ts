@@ -18,15 +18,15 @@ interface HastNode {
   children?: HastNode[];
 }
 
-const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
+const LATIN_WORD_CHARACTER = /[\p{Script=Latin}\p{N}_]/u;
 const SKIPPED_TAGS = new Set(["a", "code", "pre", "script", "style"]);
 
 function escapeRegularExpression(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function isWordCharacter(value: string | undefined): boolean {
-  return value !== undefined && WORD_CHARACTER.test(value);
+function isLatinWordCharacter(value: string | undefined): boolean {
+  return value !== undefined && LATIN_WORD_CHARACTER.test(value);
 }
 
 export function normalizeFaustMarkdown(content: string): string {
@@ -54,9 +54,9 @@ export function splitFaustExistenceNames(text: string, existences: FaustExistenc
     const name = match[0];
     const start = match.index;
     const end = start + name.length;
-    const startsWithWord = isWordCharacter(Array.from(name)[0]);
-    const endsWithWord = isWordCharacter(Array.from(name).at(-1));
-    if ((startsWithWord && isWordCharacter(text[start - 1])) || (endsWithWord && isWordCharacter(text[end]))) continue;
+    const startsWithLatinWord = isLatinWordCharacter(Array.from(name)[0]);
+    const endsWithLatinWord = isLatinWordCharacter(Array.from(name).at(-1));
+    if ((startsWithLatinWord && isLatinWordCharacter(text[start - 1])) || (endsWithLatinWord && isLatinWordCharacter(text[end]))) continue;
     if (start > cursor) segments.push({ text: text.slice(cursor, start) });
     segments.push({ text: name, existence: linksByName.get(name) });
     cursor = end;

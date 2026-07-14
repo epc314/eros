@@ -179,11 +179,11 @@ export function decodeTreasure(hashHex: string): { subjectIndex: number; subject
 }
 
 export function buildTreasureImagePrompt(subjectName: string, ownerName: string, tokens: TreasureToken[]): string {
-  return `Generate a single collectible mythic treasure artifact named “${ownerName}的${subjectName}”.\n\nUnified visual style:\n${EROS_VISUAL_STYLE}\n\nTreasure subject:\n- ${subjectName}, clearly recognizable as the central artifact\n\nDeterministic attributes:\n${tokens.map((token) => `- ${token.family}: ${token.phrase}`).join("\n")}\n\nShow only one coherent treasure as the unmistakable focus. Use an uncluttered museum-like composition and preserve all attributes as tasteful properties of the artifact. Do not depict the owner as a character. Do not add text, captions, labels, logos, signatures, or watermarks.`;
+  return `Generate a single collectible mythic treasure artifact named “${ownerName} 的 ${subjectName}”.\n\nUnified visual style:\n${EROS_VISUAL_STYLE}\n\nTreasure subject:\n- ${subjectName}, clearly recognizable as the central artifact\n\nDeterministic attributes:\n${tokens.map((token) => `- ${token.family}: ${token.phrase}`).join("\n")}\n\nShow only one coherent treasure as the unmistakable focus. Use an uncluttered museum-like composition and preserve all attributes as tasteful properties of the artifact. Do not depict the owner as a character. Do not add text, captions, labels, logos, signatures, or watermarks.`;
 }
 
 export function createTreasureName(ownerName: string, subjectName: string): string {
-  return `【${ownerName}】的【${subjectName}】`;
+  return `${ownerName} 的 ${subjectName}`;
 }
 
 export function addTreasureInstanceNumber(baseName: string, instanceNumber: number): string {

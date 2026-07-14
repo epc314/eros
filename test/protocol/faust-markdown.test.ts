@@ -6,7 +6,7 @@ const existences = [
   { id: "eros-id", name: "Eros" },
   { id: "eros-prime-id", name: "Eros Prime" },
   { id: "emoji-id", name: "😧" },
-  { id: "treasure-id", name: "【Gaia】的【宝珠】", href: "/treasures/treasure-id", kind: "treasure" as const },
+  { id: "treasure-id", name: "Gaia 的 宝珠", href: "/treasures/treasure-id", kind: "treasure" as const },
 ];
 
 describe("Faust existence links", () => {
@@ -20,6 +20,12 @@ describe("Faust existence links", () => {
     expect(segments.filter((item) => item.existence).map((item) => item.existence?.name))
       .toEqual(["Gaia", "Eros Prime", "😧"]);
     expect(segments.map((item) => item.text).join("")).toBe("Gaia 与 Eros Prime 看着 Erosian 和 😧。");
+  });
+
+  it("links Latin canonical names beside Chinese narrative text", () => {
+    const segments = splitFaustExistenceNames("Gaia遇见Eros，但不是Erosian。", existences);
+    expect(segments.filter((item) => item.existence).map((item) => item.existence?.name))
+      .toEqual(["Gaia", "Eros"]);
   });
 
   it("adds card links while leaving existing links and code untouched", () => {
@@ -41,7 +47,7 @@ describe("Faust existence links", () => {
   });
 
   it("uses the explicit detail URL for treasure names", () => {
-    const tree = { type: "root", children: [{ type: "element", tagName: "p", children: [{ type: "text", value: "【Gaia】的【宝珠】" }] }] };
+    const tree = { type: "root", children: [{ type: "element", tagName: "p", children: [{ type: "text", value: "Gaia 的 宝珠" }] }] };
     rehypeFaustExistenceLinks(existences)()(tree);
     expect((tree.children[0].children?.[0] as { properties?: { href?: string } }).properties?.href).toBe("/treasures/treasure-id");
   });
