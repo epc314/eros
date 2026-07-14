@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FaustChat } from "@/components/faust/FaustChat";
+import { MephistoTreasure } from "@/components/mephisto/MephistoTreasure";
 import { PROTOCOL_VERSION } from "@/lib/protocol/constants";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://eros-genome-world.cassette2024.chatgpt.site"),
   title: "Eros — deterministic digital evolution",
-  description: "A public world of immutable 512-bit entities.",
+  description: "A public mythic world of immutable entities, genealogy, stories, and hash-discovered treasures.",
+  openGraph: {
+    title: "Eros — 谱系 · 记述 · 宝物",
+    description: "在确定性的谱系中创造存在，并借梅菲斯特的咒语搜罗宝物。",
+    images: [{ url: "/og.png", width: 1659, height: 948, alt: "Eros 谱系、记述与宝物" }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og.png"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -18,5 +26,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </header>
     {children}
     <FaustChat />
+    <MephistoTreasure />
   </body></html>;
 }

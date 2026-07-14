@@ -1,6 +1,7 @@
 import { ApiFailure, apiError } from "@/lib/api";
 import { getHostedEnv } from "@/lib/hosted/env";
 import { getHostedImageRecord } from "@/lib/hosted/repository";
+import { getTreasureImageRecord } from "@/lib/hosted/treasure-repository";
 import { createJpegThumbnail } from "@/lib/image/thumbnail";
 
 const THUMBNAIL_WIDTH = 512;
@@ -20,7 +21,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   try {
     const { id } = await context.params;
     const environment = getHostedEnv();
-    const record = await getHostedImageRecord(id);
+    const record = await getHostedImageRecord(id) ?? await getTreasureImageRecord(id);
     if (!record?.r2Key) throw new ApiFailure("IMAGE_NOT_FOUND", "Image not found.", 404);
     const thumbnailKey = `thumbnails-v3/${id}.jpg`;
     const existing = await environment.EROS_IMAGES.get(thumbnailKey);

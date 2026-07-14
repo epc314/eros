@@ -1,11 +1,12 @@
 import { ApiFailure, apiError } from "@/lib/api";
 import { getHostedEnv } from "@/lib/hosted/env";
 import { getHostedImageRecord } from "@/lib/hosted/repository";
+import { getTreasureImageRecord } from "@/lib/hosted/treasure-repository";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const record = await getHostedImageRecord(id);
+    const record = await getHostedImageRecord(id) ?? await getTreasureImageRecord(id);
     if (!record?.r2Key) throw new ApiFailure("IMAGE_NOT_FOUND", "Image not found.", 404);
     const object = await getHostedEnv().EROS_IMAGES.get(record.r2Key);
     if (!object) throw new ApiFailure("IMAGE_NOT_FOUND", "Image not found.", 404);

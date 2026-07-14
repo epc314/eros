@@ -20,3 +20,4 @@ services/flux2/.venv
 services/flux2/output
 __pycache__/
 *.pyc
+.DS_Store

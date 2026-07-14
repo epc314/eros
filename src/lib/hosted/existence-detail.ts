@@ -1,6 +1,7 @@
 import { buildEntityImagePrompt } from "../protocol/prompt";
 import { decodeGenome } from "../protocol/token-decoder";
 import { getHostedNodeByReference } from "./repository";
+import { listNodeTreasures } from "./treasure-repository";
 
 export async function hostedExistenceDetail(reference: string) {
   const detail = await getHostedNodeByReference(reference);
@@ -10,6 +11,7 @@ export async function hostedExistenceDetail(reference: string) {
     ...record,
     feedback: { trueVotes: trueCount, falseVotes: falseCount, disputed: falseCount > trueCount },
   }));
+  const treasures = await listNodeTreasures(node.id);
   return {
     schema: "eros-existence-detail-v1" as const,
     generatedAt: new Date().toISOString(),
@@ -23,5 +25,6 @@ export async function hostedExistenceDetail(reference: string) {
     prompt: buildEntityImagePrompt(tokens),
     images,
     records,
+    treasures,
   };
 }

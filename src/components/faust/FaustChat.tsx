@@ -48,7 +48,7 @@ function FaustMarkdown({ content, existenceLinks }: { content: string; existence
         table: ({ children }) => <table className="my-2 w-full border-collapse text-left text-xs">{children}</table>,
         th: ({ children }) => <th className="border border-white/10 bg-white/5 px-2 py-1 font-semibold text-amber-50">{children}</th>,
         td: ({ children }) => <td className="border border-white/10 px-2 py-1 align-top">{children}</td>,
-        a: ({ href, children, title }) => href?.startsWith("/nodes/")
+        a: ({ href, children, title }) => href?.startsWith("/nodes/") || href?.startsWith("/treasures/")
           ? <Link href={href} target="_blank" rel="noreferrer" title={title} className="font-semibold text-amber-200 underline decoration-amber-200/35 underline-offset-2 hover:text-amber-100">{children}</Link>
           : <a href={href} target="_blank" rel="noreferrer" title={title} className="text-cyan-300 underline decoration-cyan-300/30 underline-offset-2 hover:text-cyan-200">{children}</a>,
       }}
@@ -74,10 +74,19 @@ export function FaustChat() {
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    void fetch("/api/graph", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => ({ response, body: await response.json() as { nodes?: SearchExistence[] } }))
-      .then(({ response, body }) => {
-        if (response.ok) setExistenceLinks((body.nodes ?? []).map(({ id, name }) => ({ id, name })));
+    void Promise.all([
+      fetch("/api/graph", { cache: "no-store", signal: controller.signal }),
+      fetch("/api/treasures", { cache: "no-store", signal: controller.signal }),
+    ]).then(async ([graphResponse, treasureResponse]) => ({
+      graphResponse,
+      treasureResponse,
+      graph: await graphResponse.json() as { nodes?: SearchExistence[] },
+      atlas: await treasureResponse.json() as { treasures?: Array<{ id: string; name: string }> },
+    })).then(({ graphResponse, treasureResponse, graph, atlas }) => {
+        if (graphResponse.ok && treasureResponse.ok) setExistenceLinks([
+          ...(graph.nodes ?? []).map(({ id, name }) => ({ id, name, href: `/nodes/${encodeURIComponent(id)}`, kind: "existence" as const })),
+          ...(atlas.treasures ?? []).map(({ id, name }) => ({ id, name, href: `/treasures/${encodeURIComponent(id)}`, kind: "treasure" as const })),
+        ]);
       }).catch((cause: unknown) => {
         if (!(cause instanceof DOMException && cause.name === "AbortError")) setExistenceLinks([]);
       });

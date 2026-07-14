@@ -5,6 +5,7 @@ import { composeFaustMessages } from "@/lib/faust";
 import { getHostedEnv } from "@/lib/hosted/env";
 import { hostedExistenceDetail } from "@/lib/hosted/existence-detail";
 import { hostedWorldContext } from "@/lib/hosted/repository";
+import { hostedTreasureContext } from "@/lib/hosted/treasure-repository";
 import { enforceRateLimit, requestAddress } from "@/lib/security/rate-limit";
 import { formatStoryContextText } from "@/lib/story-context";
 
@@ -36,14 +37,17 @@ export async function POST(request: Request) {
 
     const references = [...new Set(body.messages.flatMap((message) => message.existenceRefs ?? []))];
     if (references.length > 16) throw new ApiFailure("TOO_MANY_RETRIEVED_EXISTENCES", "A conversation may reference at most 16 unique existences.", 400);
-    const [worldContext, ...details] = await Promise.all([
+    const [worldContext, treasureContext, ...details] = await Promise.all([
       hostedWorldContext({ language: "zh" }),
+      hostedTreasureContext(),
       ...references.map((reference) => hostedExistenceDetail(reference)),
     ]);
     const detailsByReference = new Map(references.map((reference, index) => [reference, details[index]]));
     const messages = composeFaustMessages({
       worldContext: formatStoryContextText(worldContext),
       canonicalNames: worldContext.generations.flatMap((group) => group.existences.map((existence) => existence.name)),
+      canonicalTreasureNames: treasureContext.names,
+      treasureContext: treasureContext.text,
       conversation: body.messages,
       detailsByReference,
     });

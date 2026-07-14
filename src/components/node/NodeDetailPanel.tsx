@@ -47,6 +47,7 @@ interface Detail {
   prompt: string;
   images: Array<{ id: string; imageDataUrl?: string; imageUrl?: string; thumbnailUrl?: string; status: string; provider: string; providerModel?: string; variationId?: string; width?: number; height?: number; createdAt: string }>;
   descriptions: Array<{ id: string; body: string; authorLabel?: string; kind: RecordKind; createdAt: string; trueCount: number; falseCount: number }>;
+  treasures: Array<{ id: string; name: string; subjectName: string; subjectGroup: string; descriptions: number; imageCount: number }>;
 }
 
 interface InitialExistence {
@@ -117,6 +118,14 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
   const [message, setMessage] = useState("");
   const load = useCallback(async (force = false) => setDetail(await requestDetail(nodeId, force)), [nodeId]);
   useEffect(() => { setDetail(detailCache.get(nodeId) ?? null); void load(); }, [load, nodeId]);
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const ownerNodeId = (event as CustomEvent<{ ownerNodeId?: string }>).detail?.ownerNodeId;
+      if (!ownerNodeId || ownerNodeId === nodeId) void load(true);
+    };
+    window.addEventListener("eros-treasure-collected", refresh);
+    return () => window.removeEventListener("eros-treasure-collected", refresh);
+  }, [load, nodeId]);
 
   async function addDescription(event: React.FormEvent) {
     event.preventDefault(); setMessage("");
@@ -185,6 +194,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     <div className="mt-5 flex flex-wrap gap-2">{onSelectParent && <button disabled={node.isDead} onClick={() => onSelectParent(node.id)} className="min-h-11 flex-1 rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-medium disabled:bg-slate-700 disabled:text-slate-400 sm:flex-none">{node.isDead ? "死亡存在不可作为亲本" : "选择为亲本"}</button>} {!standalone && <Link href={`/nodes/${node.id}`} className="grid min-h-11 flex-1 place-items-center rounded-xl border border-white/10 px-4 py-2 text-center text-sm sm:flex-none">打开完整页面</Link>}</div>
     {primaryImage && <figure className="mt-6"><img src={primaryImage.thumbnailUrl ?? primaryImage.imageDataUrl ?? primaryImage.imageUrl} alt={`${node.name} 的视觉解释`} width={512} height={320} decoding="async" className={`mx-auto h-auto max-h-[70vh] max-w-full rounded-2xl border border-white/10 bg-black object-contain ${node.isDead ? "grayscale" : ""}`}/><figcaption className="mt-2 text-center text-[10px] text-slate-500">{primaryImage.providerModel ?? primaryImage.provider} · {primaryImage.width && primaryImage.height ? `${primaryImage.width}×${primaryImage.height}` : "原始尺寸"}{primaryImage.imageUrl && <a href={primaryImage.imageUrl} target="_blank" rel="noreferrer" className="ml-2 text-cyan-300">查看原图</a>}</figcaption></figure>}
     {recordSection}
+    <section className="mt-7 rounded-2xl border border-emerald-300/15 bg-emerald-300/[.025] p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">所属宝物 · {detail.treasures.length}</h2><p className="mt-1 text-xs text-slate-500">经梅菲斯特搜罗并已收入图鉴的宝物。</p></div><Link href="/treasures" className="text-xs text-emerald-300">宝物图鉴</Link></div>{detail.treasures.length ? <div className="mt-3 space-y-2">{detail.treasures.map((treasure) => <Link key={treasure.id} href={`/treasures/${treasure.id}`} className="flex min-h-12 items-center justify-between rounded-xl border border-white/10 bg-black/20 px-3 hover:border-emerald-300/25"><span><span className="block text-sm text-slate-200">{treasure.name}</span><span className="text-[10px] text-slate-600">{treasure.subjectGroup}</span></span><span className="text-[10px] text-slate-500">{treasure.imageCount} 图 · {treasure.descriptions} 记述</span></Link>)}</div> : <p className="mt-4 text-sm text-slate-600">尚无宝物与该存在相合。</p>}</section>
     <section className="mt-7"><h2 className="font-semibold">不可变身份</h2><p className="mt-3 text-xs text-slate-500">512-bit Hash</p><p data-testid="full-hash" className="hash mt-1 rounded-xl bg-black/25 p-3 text-xs">{node.genomeHex}</p><details className="mt-3"><summary className="cursor-pointer text-sm text-cyan-300">两条 256-bit 染色体</summary><p className="hash mt-2 text-xs text-slate-400">0 · {node.chromosome0Hex}</p><p className="hash mt-2 text-xs text-slate-400">1 · {node.chromosome1Hex}</p></details></section>
     <section className="mt-7 grid grid-cols-2 gap-4"><div><h2 className="font-semibold">亲本</h2>{detail.parents.length ? detail.parents.map((item) => <Link className="mt-2 block text-sm text-cyan-300" key={item.id} href={`/nodes/${item.id}`}>{item.name}</Link>) : <p className="mt-2 text-sm text-slate-500">创世存在无入边</p>}</div><div><h2 className="font-semibold">子代</h2>{detail.children.map((item) => <Link className="mt-2 block text-sm text-fuchsia-300" key={item.id} href={`/nodes/${item.id}`}>{item.name}</Link>)}{!detail.children.length && <p className="mt-2 text-sm text-slate-500">尚无</p>}</div></section>
     {detail.reproduction && <section className="mt-7 rounded-2xl border border-white/10 p-4"><h2 className="font-semibold">亲缘不稳定度</h2><dl className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-400">{node.protocolVersion === "eros-v3" && <><dt>片段交换模式</dt><dd>{detail.reproduction.segmentSwapMode.toString(2).padStart(2, "0")}</dd></>}<dt>相似度</dt><dd>{(detail.reproduction.similarityRatio * 100).toFixed(2)}%</dd><dt>相同 bit</dt><dd>{detail.reproduction.sameBitCount}</dd><dt>Hamming 距离</dt><dd>{detail.reproduction.hammingDistance}</dd><dt>实际翻转</dt><dd>{detail.reproduction.mutationBitCount}</dd></dl><details className="mt-3"><summary className="cursor-pointer text-xs text-cyan-300">bit 翻转位置</summary><p data-testid="flipped-positions" className="hash mt-2 text-xs text-slate-400">{JSON.parse(detail.reproduction.flippedBitPositionsJson).join(", ")}</p></details></section>}

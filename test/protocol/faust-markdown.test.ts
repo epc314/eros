@@ -6,6 +6,7 @@ const existences = [
   { id: "eros-id", name: "Eros" },
   { id: "eros-prime-id", name: "Eros Prime" },
   { id: "emoji-id", name: "😧" },
+  { id: "treasure-id", name: "【Gaia】的【宝珠】", href: "/treasures/treasure-id", kind: "treasure" as const },
 ];
 
 describe("Faust existence links", () => {
@@ -37,5 +38,11 @@ describe("Faust existence links", () => {
       .toEqual(["/nodes/gaia-id", "/nodes/eros-id"]);
     expect(tree.children[1].children?.[0]).toMatchObject({ type: "text", value: "Gaia" });
     expect(tree.children[2].children?.[0]).toMatchObject({ type: "text", value: "Eros" });
+  });
+
+  it("uses the explicit detail URL for treasure names", () => {
+    const tree = { type: "root", children: [{ type: "element", tagName: "p", children: [{ type: "text", value: "【Gaia】的【宝珠】" }] }] };
+    rehypeFaustExistenceLinks(existences)()(tree);
+    expect((tree.children[0].children?.[0] as { properties?: { href?: string } }).properties?.href).toBe("/treasures/treasure-id");
   });
 });

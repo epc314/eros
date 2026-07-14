@@ -1,6 +1,8 @@
 export interface FaustExistenceLink {
   id: string;
   name: string;
+  href?: string;
+  kind?: "existence" | "treasure";
 }
 
 export interface FaustTextSegment {
@@ -77,8 +79,8 @@ export function rehypeFaustExistenceLinks(existences: FaustExistenceLink[]) {
                 type: "element",
                 tagName: "a",
                 properties: {
-                  href: `/nodes/${encodeURIComponent(segment.existence.id)}`,
-                  title: `打开 ${segment.existence.name} 的存在卡片`,
+                  href: segment.existence.href ?? `/nodes/${encodeURIComponent(segment.existence.id)}`,
+                  title: `打开 ${segment.existence.name} 的${segment.existence.kind === "treasure" ? "宝物" : "存在"}卡片`,
                   "data-existence-name": segment.existence.name,
                 },
                 children: [{ type: "text", value: segment.text }],

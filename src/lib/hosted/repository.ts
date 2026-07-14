@@ -376,6 +376,7 @@ export async function setHostedDescriptionFeedback(descriptionId: string, voterK
 
 const BACKUP_TABLES = [
   "worlds", "nodes", "reproductions", "parent_edges", "node_descriptions", "description_feedback", "generated_images",
+  "treasures", "treasure_descriptions", "treasure_description_feedback", "treasure_images",
 ] as const;
 
 export async function exportHostedDatabase() {
