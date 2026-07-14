@@ -1,5 +1,5 @@
 import { ApiFailure } from "../api";
-import { TREASURE_PROTOCOL_VERSION, addTreasureInstanceNumber, type TreasureToken } from "../treasure/protocol";
+import { TREASURE_PROTOCOL_VERSION, addTreasureInstanceNumber, buildTreasureImagePrompt, decodeTreasure, type TreasureToken } from "../treasure/protocol";
 import { getHostedEnv } from "./env";
 import { ensureHostedSchema, WORLD_ID } from "./repository";
 
@@ -363,6 +363,37 @@ export async function clearHostedTreasures() {
   for (let index = 0; index < r2Keys.length; index += 1_000)
     await getHostedEnv().EROS_IMAGES.delete(r2Keys.slice(index, index + 1_000));
   return { cleared: true, deleted };
+}
+
+export async function prepareHostedTreasureRegeneration() {
+  await ensureHostedSchema();
+  const treasures = await all<{ id: string; name: string; searchHashHex: string }>(db().prepare(
+    "SELECT id,name,search_hash_hex AS searchHashHex FROM treasures WHERE world_id=? ORDER BY created_at,id",
+  ).bind(WORLD_ID));
+  if (!treasures.length) return { treasures: [], removedImages: 0, removedStoredImages: 0 };
+  const placeholders = treasures.map(() => "?").join(",");
+  const treasureIds = treasures.map(({ id }) => id);
+  const imageRows = await all<{ r2Key: string | null }>(db().prepare(
+    `SELECT r2_key AS r2Key FROM treasure_images WHERE treasure_id IN (${placeholders})`,
+  ).bind(...treasureIds));
+  const updates = treasures.map((treasure) => {
+    const decoded = decodeTreasure(treasure.searchHashHex);
+    return db().prepare(`UPDATE treasures SET protocol_version=?,subject_index=?,subject_name=?,subject_group=?,tokens_json=?,exact_prompt=? WHERE id=?`).bind(
+      TREASURE_PROTOCOL_VERSION,
+      decoded.subjectIndex,
+      decoded.subjectName,
+      decoded.subjectGroup,
+      JSON.stringify(decoded.tokens),
+      buildTreasureImagePrompt(decoded.subjectNameEn, decoded.tokens),
+      treasure.id,
+    );
+  });
+  for (let index = 0; index < updates.length; index += 50) await db().batch(updates.slice(index, index + 50));
+  await db().prepare(`DELETE FROM treasure_images WHERE treasure_id IN (${placeholders})`).bind(...treasureIds).run();
+  const r2Keys = [...new Set(imageRows.map(({ r2Key }) => r2Key).filter((key): key is string => Boolean(key)))];
+  for (let index = 0; index < r2Keys.length; index += 1_000)
+    await getHostedEnv().EROS_IMAGES.delete(r2Keys.slice(index, index + 1_000));
+  return { treasures, removedImages: imageRows.length, removedStoredImages: r2Keys.length };
 }
 
 export async function hostedTreasureContext(): Promise<{ text: string; names: string[] }> {

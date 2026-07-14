@@ -77,6 +77,15 @@ describe("Eros treasure protocol", () => {
     expect(last.subjectNameEn).toBe("Ritual Horn");
     expect(first.tokens).toHaveLength(15);
     expect(new Set(first.tokens.map(({ family }) => family)).size).toBe(15);
+    expect(first.tokens[7]).toMatchObject({ position: 8, family: "ornament_layout", familyZh: "纹饰布局" });
+    expect(first.tokens[12]).toMatchObject({ position: 13, family: "detail_finish", familyZh: "细部处理" });
+    const neutralVariants = Array.from({ length: 16 }, (_, value) => {
+      const bytes = Array<number>(16).fill(0);
+      bytes[8] = value;
+      bytes[13] = value;
+      return decodeTreasure(bytes.map((byte) => byte.toString(16).padStart(2, "0")).join(""));
+    });
+    expect(neutralVariants.map(({ tokens }) => `${tokens[7].phrase} ${tokens[12].phrase}`).join(" ")).not.toMatch(/pegasus|lion|dolphin|stag|eagle|swan|bull|horse|bee|butterfly|owl|serpent|gears?|hinges?|pendulum|clockwork|mechanism/i);
     expect(createTreasureName("Gaia", first.subjectName)).toBe("Gaia 的 宝珠");
     expect(addTreasureInstanceNumber("Gaia 的 宝珠", 1)).toBe("Gaia 的 宝珠");
     expect(addTreasureInstanceNumber("Gaia 的 宝珠", 2)).toBe("Gaia 的 宝珠（2）");
