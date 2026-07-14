@@ -9,6 +9,7 @@ export interface ErosHostedEnv {
   IMAGE_API_URL?: string;
   IMAGE_MODEL?: string;
   EROS_SETUP_TOKEN?: string;
+  EROS_TREASURE_ADMIN_TOKEN?: string;
   EROS_BACKUP_TOKEN?: string;
   EROS_WORLD_GENESIS_TIMESTAMP_MS?: string;
   DEEPSEEK_API_KEY?: string;

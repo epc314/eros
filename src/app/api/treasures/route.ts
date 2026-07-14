@@ -12,9 +12,9 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const expected = getHostedEnv().EROS_SETUP_TOKEN;
-    const supplied = request.headers.get("x-eros-setup-token") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    if (!expected || supplied !== expected) throw new ApiFailure("INVALID_SETUP_TOKEN", "A valid setup token is required.", 401);
+    const expected = getHostedEnv().EROS_TREASURE_ADMIN_TOKEN;
+    const supplied = request.headers.get("x-eros-treasure-admin-token") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!expected || supplied !== expected) throw new ApiFailure("INVALID_TREASURE_ADMIN_TOKEN", "A valid treasure administration token is required.", 401);
     return NextResponse.json(await clearHostedTreasures());
   } catch (error) { return apiError(error); }
 }
