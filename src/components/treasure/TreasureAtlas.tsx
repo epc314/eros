@@ -35,13 +35,13 @@ export function TreasureAtlas({ onBack }: { onBack?: () => void }) {
 
   return <main className="h-[100dvh] overflow-y-auto px-3 pb-24 pt-[76px] sm:px-5">
     <div className="mx-auto max-w-7xl">
-      <div className="glass sticky top-[76px] z-10 rounded-2xl p-4 sm:flex sm:items-center sm:justify-between sm:gap-5">
+      <div className="glass rounded-2xl p-4 sm:flex sm:items-center sm:justify-between sm:gap-5">
         <div><p className="text-xs uppercase tracking-[.2em] text-emerald-300">Mephisto collection</p><h1 className="mt-1 font-serif text-2xl text-white sm:text-3xl">宝物图鉴</h1><p className="mt-1 text-xs text-slate-500">{treasures.length} 件已被寻得并收录的宝物</p></div>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索宝物、称号、持有存在或 Hash 前缀" aria-label="搜索宝物" className="mt-3 min-h-11 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm outline-none focus:border-emerald-300/30 sm:mt-0 sm:max-w-md" />
       </div>
       {loading && <p className="py-20 text-center text-slate-500">正在翻阅宝物图鉴……</p>}
       {error && <p className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/5 p-4 text-red-200">{error}</p>}
-      {!loading && !error && !visible.length && <div className="glass mt-5 rounded-3xl py-24 text-center"><p className="font-serif text-xl text-slate-300">图鉴仍等待第一件宝物</p><p className="mt-2 text-sm text-slate-500">向右侧的梅菲斯特说出一句咒语。</p></div>}
+      {!loading && !error && !visible.length && <div className="glass mt-5 rounded-3xl py-24 text-center"><p className="font-serif text-xl text-slate-300">图鉴仍等待第一件宝物</p><p className="mt-2 text-sm text-slate-500">向左侧的梅菲斯特说出一句咒语。</p></div>}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{visible.map((treasure) => {
         const image = treasure.images[0]?.thumbnailUrl ?? treasure.images[0]?.imageUrl;
         return <Link href={`/treasures/${treasure.id}`} key={treasure.id} className="glass group overflow-hidden rounded-2xl border border-white/10 transition hover:-translate-y-1 hover:border-emerald-300/30">
