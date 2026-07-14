@@ -113,7 +113,11 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
       </div>
       <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
         <Background color="#253044" gap={26} size={1} />
-        <Controls position="bottom-left" showInteractive={false} style={{ bottom: "4.75rem" }} />
+        <Controls
+          position={isMobile ? "bottom-left" : "bottom-right"}
+          showInteractive={false}
+          style={isMobile ? { bottom: "4.75rem" } : { right: "11rem" }}
+        />
         {!isMobile && <MiniMap position="bottom-right" pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(node) => (node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
       </ReactFlow>
       <button type="button" onClick={onOpenTreasureAtlas} className="absolute bottom-3 left-3 z-20 min-h-11 rounded-xl border border-emerald-300/25 bg-slate-950/90 px-3 text-xs font-semibold text-emerald-200 shadow-xl backdrop-blur-xl">宝物图鉴</button>
