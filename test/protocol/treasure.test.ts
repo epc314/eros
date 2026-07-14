@@ -82,6 +82,7 @@ describe("Eros treasure protocol", () => {
     expect(addTreasureInstanceNumber("Gaia 的 宝珠", 2)).toBe("Gaia 的 宝珠（2）");
     const prompt = buildTreasureImagePrompt(first.subjectNameEn, first.tokens);
     expect(prompt).toContain("Treasure subject:\n- Jeweled Orb");
+    expect(prompt).toContain("A mysterious treasure with a mythic aura, presented in a painterly style with a sense of history.");
     expect(prompt).not.toMatch(/\p{Script=Han}/u);
   });
 });

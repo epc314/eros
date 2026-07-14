@@ -2,7 +2,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "../protocol/hex";
 import { EROS_VISUAL_STYLE } from "../protocol/prompt";
 
-export const TREASURE_PROTOCOL_VERSION = "eros-treasure-v3";
+export const TREASURE_PROTOCOL_VERSION = "eros-treasure-v4";
 export const TREASURE_MAX_ATTEMPTS = 3;
 export const TREASURE_TARGET_SEARCH_SUCCESS = 0.1;
 
@@ -289,7 +289,7 @@ export function decodeTreasure(hashHex: string): { subjectIndex: number; subject
 }
 
 export function buildTreasureImagePrompt(subjectNameEn: string, tokens: TreasureToken[]): string {
-  return `Generate a single collectible mythic treasure artifact: “${subjectNameEn}”.\n\nUnified visual style:\n${EROS_VISUAL_STYLE}\n\nTreasure subject:\n- ${subjectNameEn}, clearly recognizable as the central artifact\n\nDeterministic attributes:\n${tokens.map((token) => `- ${token.family}: ${token.phrase}`).join("\n")}\n\nShow only one coherent treasure as the unmistakable focus. Use an uncluttered museum-like composition and preserve all attributes as tasteful properties of the artifact. Do not depict any owner or bearer as a character. Do not add text, captions, labels, logos, signatures, or watermarks.`;
+  return `Generate a single collectible mythic treasure artifact: “${subjectNameEn}”.\n\nUnified visual style:\n${EROS_VISUAL_STYLE}\nA mysterious treasure with a mythic aura, presented in a painterly style with a sense of history.\n\nTreasure subject:\n- ${subjectNameEn}, clearly recognizable as the central artifact\n\nDeterministic attributes:\n${tokens.map((token) => `- ${token.family}: ${token.phrase}`).join("\n")}\n\nShow only one coherent treasure as the unmistakable focus. Use an uncluttered museum-like composition and preserve all attributes as tasteful properties of the artifact. Do not depict any owner or bearer as a character. Do not add text, captions, labels, logos, signatures, or watermarks.`;
 }
 
 export function createTreasureName(ownerName: string, subjectName: string): string {
