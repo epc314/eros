@@ -1,6 +1,6 @@
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
 
-export const GRAPH_NODE_WIDTH = 268;
+export const GRAPH_NODE_WIDTH = 280;
 export const GRAPH_NODE_HEIGHT = 280;
 const BASE_RING_RADIUS = 420;
 const RING_GAP = 370;
@@ -187,11 +187,17 @@ function assignHandleLanes(relations: Edge[], byId: Map<string, Node<Record<stri
  */
 export function buildRadialGraph<T extends Record<string, unknown>>(nodes: Node<T>[], relations: Edge[]) {
   const genericNodes = nodes as Node<Record<string, unknown>>[];
-  const { rows, generations, parents } = orderRows(genericNodes, relations);
+  const centerNode = genericNodes
+    .filter((node) => String(node.data.name ?? "").trim().toLowerCase() === "eros")
+    .sort((left, right) => generationOf(left) - generationOf(right) || left.id.localeCompare(right.id))[0];
+  const ringNodes = centerNode ? genericNodes.filter((node) => node.id !== centerNode.id) : genericNodes;
+  const { rows, generations, parents } = orderRows(ringNodes, relations);
   const angles = new Map<string, number>();
   const rings: RadialRing[] = [];
   const positioned = new Map<string, { x: number; y: number }>();
   let previousRadius = 0;
+
+  if (centerNode) positioned.set(centerNode.id, { x: -GRAPH_NODE_WIDTH / 2, y: -GRAPH_NODE_HEIGHT / 2 });
 
   generations.forEach((generation, ringIndex) => {
     const row = rows.get(generation)!;
@@ -216,7 +222,11 @@ export function buildRadialGraph<T extends Record<string, unknown>>(nodes: Node<
     }
   });
 
-  const radialNodes = nodes.map((node) => ({ ...node, position: positioned.get(node.id) ?? { x: 0, y: 0 } }));
+  const radialNodes = nodes.map((node) => ({
+    ...node,
+    position: positioned.get(node.id) ?? { x: 0, y: 0 },
+    data: { ...node.data, isRadialCenter: node.id === centerNode?.id },
+  }));
   const byId = new Map((radialNodes as Node<Record<string, unknown>>[]).map((node) => [node.id, node]));
   const sourceLanes = assignHandleLanes(relations, byId, "source");
   const targetLanes = assignHandleLanes(relations, byId, "target");
@@ -241,5 +251,5 @@ export function buildRadialGraph<T extends Record<string, unknown>>(nodes: Node<
     }];
   });
 
-  return { nodes: radialNodes, edges: radialEdges, rings };
+  return { nodes: radialNodes, edges: radialEdges, rings, centerNodeId: centerNode?.id ?? null };
 }

@@ -3,7 +3,7 @@
 import { ViewportPortal } from "@xyflow/react";
 import type { RadialRing } from "@/lib/graph/layout";
 
-export function RadialGraphBackdrop({ rings }: { rings: RadialRing[] }) {
+export function RadialGraphBackdrop({ rings, hasCenter }: { rings: RadialRing[]; hasCenter: boolean }) {
   return <ViewportPortal>
     <div aria-hidden className="pointer-events-none absolute z-[-1]">
       {rings.map((ring, index) => {
@@ -29,9 +29,9 @@ export function RadialGraphBackdrop({ rings }: { rings: RadialRing[] }) {
           </span>
         </div>;
       })}
-      <div className="absolute -left-14 -top-14 grid h-28 w-28 place-items-center rounded-full border border-cyan-300/15 bg-[radial-gradient(circle,rgba(34,211,238,.12),rgba(15,23,42,.52)_45%,rgba(2,6,23,.1)_72%)] shadow-[0_0_80px_rgba(34,211,238,.12)]">
+      {hasCenter ? <div className="absolute -left-[170px] -top-[170px] h-[340px] w-[340px] rounded-full border border-cyan-200/10 bg-[radial-gradient(circle,rgba(34,211,238,.08),rgba(15,23,42,.22)_58%,transparent_72%)] shadow-[0_0_100px_rgba(34,211,238,.1)]" /> : <div className="absolute -left-14 -top-14 grid h-28 w-28 place-items-center rounded-full border border-cyan-300/15 bg-[radial-gradient(circle,rgba(34,211,238,.12),rgba(15,23,42,.52)_45%,rgba(2,6,23,.1)_72%)] shadow-[0_0_80px_rgba(34,211,238,.12)]">
         <span className="h-4 w-4 rotate-45 rounded-[4px] border border-cyan-200/55 bg-cyan-300/15 shadow-[0_0_24px_rgba(103,232,249,.5)]" />
-      </div>
+      </div>}
     </div>
   </ViewportPortal>;
 }

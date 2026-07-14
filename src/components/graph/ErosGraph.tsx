@@ -61,7 +61,7 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
   }, [payload]);
 
   const graph = useMemo(() => {
-    if (!payload) return { nodes: [] as Node[], edges: [] as Edge[], rings: [], existenceCount: 0, relationshipCount: 0 };
+    if (!payload) return { nodes: [] as Node[], edges: [] as Edge[], rings: [], centerNodeId: null as string | null, existenceCount: 0, relationshipCount: 0 };
     let allowed = new Set(payload.nodes.map(({ id }) => id));
     const normalizedQuery = query.trim().toLowerCase();
     if (normalizedQuery) allowed = new Set(payload.nodes.filter((node) => node.name.toLowerCase().includes(normalizedQuery) || node.genomeHex.includes(normalizedQuery) || node.id.includes(normalizedQuery)).map(({ id }) => id));
@@ -114,7 +114,7 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
       </div>
       <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .16, minZoom: isMobile ? .42 : .12 }} minZoom={isMobile ? .28 : .1} maxZoom={1.8} nodesDraggable={false} edgesFocusable={false} edgesReconnectable={false} elevateEdgesOnSelect={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
         <Background color="#202b3d" gap={30} size={1} />
-        <RadialGraphBackdrop rings={graph.rings} />
+        <RadialGraphBackdrop rings={graph.rings} hasCenter={Boolean(graph.centerNodeId)} />
         <Controls
           position={isMobile ? "bottom-left" : "bottom-right"}
           showInteractive={false}

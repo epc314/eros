@@ -20,6 +20,22 @@ function polar(node: Node<Record<string, unknown>>) {
 }
 
 describe("radial generation layout", () => {
+  it("pins Eros to the graph origin and keeps the other genesis nodes on the first ring", () => {
+    const nodes = [
+      { id: "eros", data: { name: "Eros", generation: 0 } },
+      { id: "gaia", data: { name: "Gaia", generation: 0 } },
+      { id: "khaos", data: { name: "Khaos", generation: 0 } },
+    ].map((node) => ({ ...node, position: { x: 0, y: 0 } })) as Node<Record<string, unknown>>[];
+    const graph = buildRadialGraph(nodes, []);
+    const eros = graph.nodes.find(({ id }) => id === "eros")!;
+    const gaia = graph.nodes.find(({ id }) => id === "gaia")!;
+    expect(polar(eros).radius).toBe(0);
+    expect(eros.data.isRadialCenter).toBe(true);
+    expect(polar(gaia).radius).toBeGreaterThan(0);
+    expect(graph.centerNodeId).toBe("eros");
+    expect(graph.rings.map(({ generation }) => generation)).toEqual([0]);
+  });
+
   it("keeps each generation on a stable concentric ring", () => {
     const nodes = [
       { id: "root-b", data: { name: "Beta", generation: 0 } },

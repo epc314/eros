@@ -32,23 +32,23 @@ export interface ErosNodeData extends Record<string, unknown> {
   auxiliaryEntities: string[];
   auxiliaryEntitiesZh: string[];
   selectedAs?: "A" | "B";
+  isRadialCenter?: boolean;
 }
 
 export function GraphNodeCard({ data, selected }: NodeProps) {
   const item = data as ErosNodeData;
-  return <article aria-label={`${item.name} · ${item.primaryEntityZh}`} onPointerEnter={() => prefetchExistenceDetail(item.id)} onPointerDown={() => prefetchExistenceDetail(item.id)} className={`w-[268px] overflow-hidden rounded-2xl border shadow-2xl transition ${item.isDead ? "border-slate-500/30 bg-[#20242c] grayscale" : "bg-[#111827]"} ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
+  return <article aria-label={`${item.name} · ${item.primaryEntityZh}`} onPointerEnter={() => prefetchExistenceDetail(item.id)} onPointerDown={() => prefetchExistenceDetail(item.id)} className={`relative h-[280px] w-[280px] overflow-hidden rounded-full border-2 bg-slate-950 shadow-2xl transition ${item.isDead ? "border-slate-500/35 grayscale" : "border-white/15"} ${item.isRadialCenter ? "ring-4 ring-cyan-300/10 shadow-[0_0_90px_rgba(34,211,238,.22)]" : ""} ${selected ? "!border-cyan-300 ring-4 ring-cyan-400/15 shadow-[0_0_70px_rgba(34,211,238,.3)]" : ""}`}>
     {RADIAL_HANDLES.flatMap(({ side, position }) => (["a", "b"] as const).flatMap((lane) => [
       <Handle key={`target-${side}-${lane}`} id={`target-${side}-${lane}`} type="target" position={position} style={radialHandleStyle(side, lane)} className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0" />,
       <Handle key={`source-${side}-${lane}`} id={`source-${side}-${lane}`} type="source" position={position} style={radialHandleStyle(side, lane)} className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0" />,
     ]))}
-    <div className="relative h-[188px] overflow-hidden bg-slate-950">
-      {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={512} height={320} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-contain" /> : <div className="h-full bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]" />}
-      {item.selectedAs && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-fuchsia-500 text-xs font-bold">{item.selectedAs}</span>}
-    </div>
-    <div className="px-4 py-3">
-      <h3 className="truncate text-xl font-semibold tracking-tight text-white">{item.name}</h3>
-      <div className="mt-2 flex items-center justify-between gap-3"><span className="truncate text-xs font-medium text-cyan-100">{item.primaryEntityZh}</span><span className="shrink-0 text-[11px] text-slate-400">{item.imageCount} 图 · {item.descriptionCount} 记述</span></div>
-      <div className="mt-2 border-t border-white/[.06] pt-2 text-right"><code className="hash text-[10px] tracking-[.12em] text-slate-600">{item.genomeHex.slice(0, 8)}</code></div>
+    {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={560} height={560} loading="lazy" decoding="async" fetchPriority="low" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,#164e63,#111827_56%,#020617)]" />}
+    <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,6,23,.02)_28%,rgba(2,6,23,.36)_55%,rgba(2,6,23,.96)_86%,#020617)]" />
+    {item.selectedAs && <span className="absolute right-7 top-7 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-fuchsia-500 text-xs font-bold shadow-lg">{item.selectedAs}</span>}
+    <div className="absolute inset-x-7 bottom-6 text-center">
+      <h3 className="truncate text-2xl font-semibold tracking-tight text-white drop-shadow-lg">{item.name}</h3>
+      <div className="mt-1 flex items-center justify-center gap-2 text-[11px]"><span className="max-w-[116px] truncate font-medium text-cyan-100">{item.primaryEntityZh}</span><span className="text-slate-300">{item.imageCount} 图 · {item.descriptionCount} 记述</span></div>
+      <div className="mt-2"><code className="hash text-[9px] tracking-[.16em] text-slate-500">{item.genomeHex.slice(0, 8)}</code></div>
     </div>
   </article>;
 }
