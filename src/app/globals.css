@@ -13,6 +13,7 @@ button, select { touch-action: manipulation; }
 .react-flow__attribution { display: none; }
 .react-flow__edge-path { transition: stroke .18s ease, opacity .18s ease; }
 .react-flow__edge:hover .react-flow__edge-path { stroke: #67e8f9 !important; opacity: .96 !important; }
+.react-flow__node:hover, .react-flow__node:focus-within { z-index: 1000 !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
 @media (max-width: 767px) {
   .react-flow__controls { bottom: 4.5rem !important; left: .75rem !important; }

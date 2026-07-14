@@ -1,10 +1,10 @@
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
 
-export const GRAPH_NODE_WIDTH = 280;
-export const GRAPH_NODE_HEIGHT = 280;
+export const GRAPH_NODE_WIDTH = 210;
+export const GRAPH_NODE_HEIGHT = 210;
 const BASE_RING_RADIUS = 420;
 const RING_GAP = 370;
-const NODE_ARC = 330;
+const NODE_ARC = 260;
 const TAU = Math.PI * 2;
 
 export interface RadialRing {
