@@ -72,6 +72,13 @@ export function FaustChat() {
 
   useEffect(() => { if (open) messageEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy, open]);
   useEffect(() => {
+    const closeForOtherWindow = (event: Event) => {
+      if ((event as CustomEvent<{ window?: string }>).detail?.window !== "faust") setOpen(false);
+    };
+    window.addEventListener("eros-floating-window-open", closeForOtherWindow);
+    return () => window.removeEventListener("eros-floating-window-open", closeForOtherWindow);
+  }, []);
+  useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
     void Promise.all([
@@ -148,7 +155,7 @@ export function FaustChat() {
     setMessages([initialMessage]); setDraft(""); setSelected([]); setPickerOpen(false); setSearch(""); setError("");
   }
 
-  if (!open) return <button type="button" onClick={() => setOpen(true)} aria-label="展开浮士德对话"
+  if (!open) return <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent("eros-floating-window-open", { detail: { window: "faust" } })); setOpen(true); }} aria-label="展开浮士德对话"
     className="fixed left-2 top-[46%] z-[70] flex min-h-12 items-center gap-2 rounded-r-full border border-l-0 border-amber-200/20 bg-[#17130f]/95 py-2 pl-2 pr-4 text-sm text-amber-100 shadow-2xl backdrop-blur-xl sm:left-0">
     <span className="grid h-8 w-8 place-items-center rounded-full border border-amber-200/30 bg-amber-100/10 font-serif text-lg">F</span>
     <span>浮士德</span>
