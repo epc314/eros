@@ -116,6 +116,9 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
   const [lifeBody, setLifeBody] = useState("");
   const [lifeBusy, setLifeBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const containerClassName = standalone
+    ? "glass rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:p-6"
+    : "glass fixed inset-x-0 bottom-0 top-14 z-40 w-full overflow-y-auto overscroll-contain border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:p-6 md:inset-y-16 md:left-auto md:right-0 md:max-w-xl md:border-l md:border-t-0";
   const load = useCallback(async (force = false) => setDetail(await requestDetail(nodeId, force)), [nodeId]);
   useEffect(() => { setDetail(detailCache.get(nodeId) ?? null); void load(); }, [load, nodeId]);
   useEffect(() => {
@@ -164,7 +167,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     if (response.ok) void load(true);
   }
 
-  if (!detail?.node) return <aside className={`${standalone ? "rounded-2xl sm:rounded-3xl" : "fixed inset-x-0 bottom-0 top-14 z-40 w-full border-t md:inset-y-16 md:left-auto md:right-0 md:max-w-xl md:border-l md:border-t-0"} glass overflow-y-auto p-4 shadow-2xl sm:p-6`}>
+  if (!detail?.node) return <aside className={containerClassName}>
     {initialNode ? <><div className="flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[.18em] text-cyan-300">{initialNode.type === "GENESIS" ? "Genesis root" : `Generation ${initialNode.generation}`}</p><h1 className="mt-1 text-2xl font-semibold">{initialNode.name}</h1></div>{onClose && <button onClick={onClose} aria-label="关闭" className="grid h-11 w-11 place-items-center rounded-full border border-white/10 text-xl">×</button>}</div>{(initialNode.images[0]?.thumbnailUrl || initialNode.images[0]?.imageUrl) && <img src={initialNode.images[0].thumbnailUrl ?? initialNode.images[0].imageUrl ?? ""} alt={`${initialNode.name} 的视觉解释`} width={512} height={320} decoding="async" className={`mt-6 w-full rounded-2xl border border-white/10 bg-black object-contain ${initialNode.isDead ? "grayscale" : ""}`} />}<p className="mt-5 animate-pulse text-center text-sm text-slate-500">正在载入记述与详细信息…</p></> : <div className="grid min-h-72 place-items-center text-slate-400">正在载入存在…</div>}
   </aside>;
   const { node } = detail;
@@ -188,7 +191,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
     {message && <p className="mt-3 text-xs leading-5 text-cyan-300">{message}</p>}
     <div className="mt-4 space-y-2">{detail.descriptions.map((item) => <DescriptionRecord key={item.id} item={item} onVote={vote} />)}</div>
   </section>;
-  return <aside className={`${standalone ? "rounded-2xl sm:rounded-3xl" : "fixed inset-x-0 bottom-0 top-14 z-40 w-full border-t md:inset-y-16 md:left-auto md:right-0 md:max-w-xl md:border-l md:border-t-0"} glass overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:p-6`} data-testid="node-detail">
+  return <aside className={containerClassName} data-testid="node-detail">
     <div className="flex items-start justify-between gap-3 sm:gap-4"><div className="min-w-0"><p className="text-[11px] uppercase tracking-[.16em] text-cyan-300 sm:text-xs sm:tracking-[.22em]">{node.type === "GENESIS" ? "Genesis root" : `Generation ${node.generation}`} · {node.protocolVersion}</p><h1 className="mt-1 truncate text-2xl font-semibold sm:text-3xl">{node.name}</h1><p className="mt-1 text-xs text-slate-500">名称与身份不可修改 · {new Date(node.createdAt).toLocaleString()}</p></div>{onClose && <button onClick={onClose} aria-label="关闭" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 text-xl">×</button>}</div>
     {node.type === "DESCENDANT" && node.protocolVersion === "eros-v1" && <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs leading-5 text-amber-200">旧版 eros-v1 存在：染色体可能在子代中换位，因此主体槽可能由亲本辅助槽重新解释。该历史记录保持不可变；新繁衍使用分段重组的 eros-v3。</p>}
     <div className="mt-5 flex flex-wrap gap-2">{onSelectParent && <button disabled={node.isDead} onClick={() => onSelectParent(node.id)} className="min-h-11 flex-1 rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-medium disabled:bg-slate-700 disabled:text-slate-400 sm:flex-none">{node.isDead ? "死亡存在不可作为亲本" : "选择为亲本"}</button>} {!standalone && <Link href={`/nodes/${node.id}`} className="grid min-h-11 flex-1 place-items-center rounded-xl border border-white/10 px-4 py-2 text-center text-sm sm:flex-none">打开完整页面</Link>}</div>
