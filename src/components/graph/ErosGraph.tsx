@@ -112,9 +112,11 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
         </div>
       </div>
       <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => { setSelectedId(node.id); setMobilePanelOpen(false); }} fitView fitViewOptions={{ padding: isMobile ? .08 : .2, minZoom: isMobile ? .5 : .12 }} minZoom={isMobile ? .35 : .12} maxZoom={1.6} nodesDraggable={false} onlyRenderVisibleElements proOptions={{ hideAttribution: true }}>
-        <Background color="#253044" gap={26} size={1} /><Controls position="bottom-left" showInteractive={false}/>{!isMobile && <MiniMap position="bottom-right" pannable zoomable nodeColor={(node) => (node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
+        <Background color="#253044" gap={26} size={1} />
+        <Controls position="bottom-left" showInteractive={false} style={{ bottom: "4.75rem" }} />
+        {!isMobile && <MiniMap position="bottom-right" pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(node) => (node.data.type === "GENESIS" ? "#22d3ee" : "#d946ef")} maskColor="rgba(8,11,18,.72)" />}
       </ReactFlow>
-      <button type="button" onClick={onOpenTreasureAtlas} className="absolute bottom-28 left-3 z-20 min-h-11 rounded-xl border border-emerald-300/25 bg-slate-950/90 px-3 text-xs font-semibold text-emerald-200 shadow-xl backdrop-blur-xl">宝物图鉴</button>
+      <button type="button" onClick={onOpenTreasureAtlas} className="absolute bottom-3 left-3 z-20 min-h-11 rounded-xl border border-emerald-300/25 bg-slate-950/90 px-3 text-xs font-semibold text-emerald-200 shadow-xl backdrop-blur-xl">宝物图鉴</button>
       <div className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs text-slate-400 sm:block">{graph.nodes.length} 存在 · {graph.edges.length} 亲本边 · 点击存在查看详情</div>
       <button type="button" onClick={() => { setSelectedId(null); setMobilePanelOpen(true); }} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-3 z-20 min-h-12 rounded-full bg-gradient-to-r from-fuchsia-500 to-cyan-500 px-5 text-sm font-semibold text-white shadow-xl shadow-fuchsia-950/40 md:hidden">繁衍 / 创世{parentIds.filter(Boolean).length ? ` · ${parentIds.filter(Boolean).length}/2` : ""}</button>
     </section>
