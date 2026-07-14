@@ -7,7 +7,7 @@ import { MEPHISTO_GREETING, type TreasureToken } from "@/lib/treasure/protocol";
 
 interface Match { id: string; name: string; score: number; featureHex: string }
 interface SearchAttempt { attempt: number; hashHex: string; closest: Match | null; matches: Match[] }
-interface SearchResult { timestampMs: string; attempts: SearchAttempt[]; success: boolean; finalHashHex: string; matches: Match[] }
+interface SearchResult { timestampMs: string; matchThreshold: number; attempts: SearchAttempt[]; success: boolean; finalHashHex: string; matches: Match[] }
 interface TreasureImage { id: string; imageUrl?: string | null; thumbnailUrl?: string | null; width?: number | null; height?: number | null }
 interface TreasureCandidate {
   id: string; name: string; ownerName: string; ownerNodeId: string; protocolVersion?: string; subjectName: string; subjectGroup: string;
@@ -117,7 +117,7 @@ export function MephistoTreasure() {
         <h3 className="text-xs font-semibold text-emerald-100">命运匹配</h3>
         <div className="mt-2 space-y-2">{search.attempts.map((attempt) => <div key={attempt.attempt} className="text-xs leading-5 text-slate-400">
           <div className="flex items-center justify-between"><span>第 {attempt.attempt} 次</span><code className="text-[10px] text-slate-600">{attempt.hashHex.slice(0, 12)}…</code></div>
-          {attempt.matches.length ? <p className="text-emerald-300">匹配成功 · {attempt.matches.length} 个存在超过 76 个相同 bit</p> : <p>未越过阈值 · 最近的是 <Link className="text-cyan-300" href={`/nodes/${attempt.closest?.id}`}>{attempt.closest?.name ?? "无"}</Link>{attempt.closest ? `（${attempt.closest.score}/128 bit 相同）` : ""}</p>}
+          {attempt.matches.length ? <p className="text-emerald-300">匹配成功 · {attempt.matches.length} 个存在与咒语相合</p> : <p>未能相合 · 最近的是 <Link className="text-cyan-300" href={`/nodes/${attempt.closest?.id}`}>{attempt.closest?.name ?? "无"}</Link>{attempt.closest ? `（${attempt.closest.score}/128 bit 相同）` : ""}</p>}
         </div>)}</div>
       </section>}
 
@@ -128,7 +128,7 @@ export function MephistoTreasure() {
         <h3 className="text-sm font-semibold text-emerald-50">选择一条与咒语相合的命运</h3>
         <div className="mt-2 space-y-2">{search.matches.map((match) => <button type="button" key={match.id} onClick={() => void generate(match, search, activeSpell)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-200/15 bg-emerald-100/5 px-3 text-left text-sm hover:bg-emerald-100/10"><span>{match.name}</span><span className="text-xs text-emerald-300">{match.score}/128 bit 相同</span></button>)}</div>
       </section>}
-      {phase === "choosing" && search && !search.success && <p className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-sm leading-6 text-amber-100">三次戏法都未能找到超过 76 个相同 bit 的存在。换一句咒语，或让时间流逝片刻再试。</p>}
+      {phase === "choosing" && search && !search.success && <p className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-sm leading-6 text-amber-100">三次戏法都未能找到相合的存在。换一句咒语，或让时间流逝片刻再试。</p>}
 
       {candidate && (phase === "candidate" || phase === "collected") && <section className="overflow-hidden rounded-2xl border border-emerald-100/15 bg-black/25">
         {(images[0]?.thumbnailUrl || images[0]?.imageUrl) && <img src={images[0].thumbnailUrl ?? images[0].imageUrl ?? ""} alt={candidate.name} width={512} height={320} className="h-auto w-full bg-black object-contain" />}

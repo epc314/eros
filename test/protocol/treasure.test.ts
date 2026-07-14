@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  TREASURE_MATCH_THRESHOLD,
   TREASURE_SUBJECTS,
   TREASURE_SUBJECTS_EN,
   addTreasureInstanceNumber,
@@ -10,6 +9,7 @@ import {
   decodeTreasure,
   intersectionScore,
   searchTreasures,
+  treasureMatchThreshold,
   xnorSimilarityScore,
 } from "../../src/lib/treasure/protocol";
 
@@ -43,8 +43,15 @@ describe("Eros treasure protocol", () => {
     expect(xnorSimilarityScore("0f".repeat(16), "ff".repeat(16))).toBe(64);
   });
 
+  it("raises the threshold with the existence count to keep a complete search near the target rarity", () => {
+    expect(treasureMatchThreshold(0)).toBe(128);
+    expect(treasureMatchThreshold(1)).toBe(74);
+    expect(treasureMatchThreshold(13)).toBe(79);
+    expect(treasureMatchThreshold(100)).toBeGreaterThan(treasureMatchThreshold(13));
+  });
+
   it("uses SHA-256, retries exactly twice, and reports the closest existence", () => {
-    const failed = searchTreasures("风穿过橄榄林", "1720958400000", [{ id: "void", name: "Void", genomeHex: "0000".repeat(32) }]);
+    const failed = searchTreasures("风穿过橄榄林", "1720958400000", [{ id: "void", name: "Void", genomeHex: "ffff".repeat(32) }]);
     expect(failed.success).toBe(false);
     expect(failed.attempts.map(({ hashHex }) => hashHex)).toEqual([
       "bb0bf0246685348a2c4c0a55ac090a1d",
@@ -58,7 +65,7 @@ describe("Eros treasure protocol", () => {
     expect(matched.success).toBe(true);
     expect(matched.attempts).toHaveLength(1);
     expect(matched.matches[0].score).toBe(128);
-    expect(matched.matches[0].score).toBeGreaterThan(TREASURE_MATCH_THRESHOLD);
+    expect(matched.matches[0].score).toBeGreaterThan(matched.matchThreshold);
   });
 
   it("decodes one subject and fifteen independent descriptive tokens", () => {

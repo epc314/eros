@@ -2,11 +2,9 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "../protocol/hex";
 import { EROS_VISUAL_STYLE } from "../protocol/prompt";
 
-export const TREASURE_PROTOCOL_VERSION = "eros-treasure-v2";
-// A random 128-bit XNOR score is centered on 64. Requiring >76 preserves roughly
-// the rarity of the former balanced AND rule (>40 out of about 64 one-bits).
-export const TREASURE_MATCH_THRESHOLD = 76;
+export const TREASURE_PROTOCOL_VERSION = "eros-treasure-v3";
 export const TREASURE_MAX_ATTEMPTS = 3;
+export const TREASURE_TARGET_SEARCH_SUCCESS = 0.1;
 
 export const MEPHISTO_GREETING = "我是永远否定的精灵，是总想行恶却行了善的力量的一部分。发生的一切终将毁灭，不如借我的戏法神游八方。我是梅菲斯特，告诉我你的咒语，借你我的魔力搜罗万千宝物";
 
@@ -172,6 +170,7 @@ export interface TreasureSearchAttempt {
 
 export interface TreasureSearchResult {
   timestampMs: string;
+  matchThreshold: number;
   attempts: TreasureSearchAttempt[];
   success: boolean;
   finalHashHex: string;
@@ -209,8 +208,44 @@ export function xnorSimilarityScore(searchHashHex: string, featureHex: string): 
   return 128 - differentBits;
 }
 
+const XNOR_SCORE_PROBABILITIES = (() => {
+  const probabilities = Array<number>(129).fill(0);
+  probabilities[0] = 2 ** -128;
+  for (let score = 0; score < 128; score += 1)
+    probabilities[score + 1] = probabilities[score] * (128 - score) / (score + 1);
+  return probabilities;
+})();
+
+const XNOR_PROBABILITY_ABOVE = (() => {
+  const tails = Array<number>(129).fill(0);
+  let tail = 0;
+  for (let threshold = 128; threshold >= 0; threshold -= 1) {
+    tails[threshold] = tail;
+    tail += XNOR_SCORE_PROBABILITIES[threshold];
+  }
+  return tails;
+})();
+
+export function treasureMatchThreshold(nodeCount: number): number {
+  if (!Number.isInteger(nodeCount) || nodeCount < 0) throw new RangeError("Existence count must be a non-negative integer");
+  if (nodeCount === 0) return 128;
+  let bestThreshold = 0;
+  let smallestDifference = Number.POSITIVE_INFINITY;
+  for (let threshold = 0; threshold <= 128; threshold += 1) {
+    const perComparison = XNOR_PROBABILITY_ABOVE[threshold];
+    const completeSearchSuccess = 1 - (1 - perComparison) ** (nodeCount * TREASURE_MAX_ATTEMPTS);
+    const difference = Math.abs(completeSearchSuccess - TREASURE_TARGET_SEARCH_SUCCESS);
+    if (difference < smallestDifference) {
+      bestThreshold = threshold;
+      smallestDifference = difference;
+    }
+  }
+  return bestThreshold;
+}
+
 export function searchTreasures(spell: string, timestampMs: string | number | bigint, nodes: TreasureMatchNode[]): TreasureSearchResult {
   const timestamp = String(timestampMs);
+  const matchThreshold = treasureMatchThreshold(nodes.length);
   let hashHex = hash128(`${spell}｜${timestamp}`);
   const attempts: TreasureSearchAttempt[] = [];
   for (let attempt = 1; attempt <= TREASURE_MAX_ATTEMPTS; attempt += 1) {
@@ -218,12 +253,12 @@ export function searchTreasures(spell: string, timestampMs: string | number | bi
       const featureHex = node.featureHex ?? createExistenceFeature(node.genomeHex);
       return { id: node.id, name: node.name, featureHex, score: xnorSimilarityScore(hashHex, featureHex) };
     }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-    const matches = ranked.filter((item) => item.score > TREASURE_MATCH_THRESHOLD);
+    const matches = ranked.filter((item) => item.score > matchThreshold);
     attempts.push({ attempt, hashHex, closest: ranked[0] ?? null, matches });
-    if (matches.length) return { timestampMs: timestamp, attempts, success: true, finalHashHex: hashHex, matches };
+    if (matches.length) return { timestampMs: timestamp, matchThreshold, attempts, success: true, finalHashHex: hashHex, matches };
     if (attempt < TREASURE_MAX_ATTEMPTS) hashHex = hash128(`${hashHex}｜${timestamp}`);
   }
-  return { timestampMs: timestamp, attempts, success: false, finalHashHex: hashHex, matches: [] };
+  return { timestampMs: timestamp, matchThreshold, attempts, success: false, finalHashHex: hashHex, matches: [] };
 }
 
 export function decodeTreasure(hashHex: string): { subjectIndex: number; subjectName: string; subjectNameEn: string; subjectGroup: string; subjectGroupEn: string; tokens: TreasureToken[] } {
