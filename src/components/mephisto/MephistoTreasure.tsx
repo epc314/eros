@@ -17,6 +17,7 @@ interface TreasureCandidate {
 
 export function MephistoTreasure() {
   const [open, setOpen] = useState(false);
+  const [hiddenByOtherWindow, setHiddenByOtherWindow] = useState(false);
   const [spell, setSpell] = useState("");
   const [search, setSearch] = useState<SearchResult | null>(null);
   const [candidate, setCandidate] = useState<TreasureCandidate | null>(null);
@@ -28,10 +29,19 @@ export function MephistoTreasure() {
   useEffect(() => { if (open) scrollEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [open, phase, candidate, error]);
   useEffect(() => {
     const closeForOtherWindow = (event: Event) => {
-      if ((event as CustomEvent<{ window?: string }>).detail?.window !== "mephisto") setOpen(false);
+      const otherWindowOpen = (event as CustomEvent<{ window?: string }>).detail?.window !== "mephisto";
+      setHiddenByOtherWindow(otherWindowOpen);
+      if (otherWindowOpen) setOpen(false);
+    };
+    const restoreAfterOtherWindowCloses = (event: Event) => {
+      if ((event as CustomEvent<{ window?: string }>).detail?.window !== "mephisto") setHiddenByOtherWindow(false);
     };
     window.addEventListener("eros-floating-window-open", closeForOtherWindow);
-    return () => window.removeEventListener("eros-floating-window-open", closeForOtherWindow);
+    window.addEventListener("eros-floating-window-close", restoreAfterOtherWindowCloses);
+    return () => {
+      window.removeEventListener("eros-floating-window-open", closeForOtherWindow);
+      window.removeEventListener("eros-floating-window-close", restoreAfterOtherWindowCloses);
+    };
   }, []);
 
   function reset() {
@@ -83,6 +93,7 @@ export function MephistoTreasure() {
     } catch { setError("宝物收录失败，请检查网络后再试。"); }
   }
 
+  if (!open && hiddenByOtherWindow) return null;
   if (!open) return <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent("eros-floating-window-open", { detail: { window: "mephisto" } })); setOpen(true); }} aria-label="展开梅菲斯特宝物搜索"
     className="fixed left-2 top-[55%] z-[69] flex min-h-12 items-center gap-2 rounded-r-full border border-l-0 border-emerald-200/20 bg-[#0d1712]/95 py-2 pl-2 pr-4 text-sm text-emerald-100 shadow-2xl backdrop-blur-xl sm:left-0">
     <span className="grid h-8 w-8 place-items-center rounded-full border border-emerald-200/30 bg-emerald-100/10 font-serif text-lg">M</span><span>梅菲斯特</span>
@@ -94,7 +105,7 @@ export function MephistoTreasure() {
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-emerald-200/25 bg-emerald-100/10 font-serif text-xl text-emerald-100">M</span>
       <div className="min-w-0 flex-1"><h2 className="font-serif text-lg text-emerald-50">梅菲斯特</h2><p className="text-[11px] tracking-[.12em] text-emerald-100/45">万千宝物的搜罗者</p></div>
       <button type="button" onClick={reset} disabled={working} className="min-h-9 rounded-full border border-white/10 px-3 text-xs text-slate-400 disabled:opacity-30">重置</button>
-      <button type="button" onClick={() => setOpen(false)} aria-label="收起梅菲斯特" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xl text-slate-400">‹</button>
+      <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent("eros-floating-window-close", { detail: { window: "mephisto" } })); }} aria-label="收起梅菲斯特" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xl text-slate-400">‹</button>
     </header>
 
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">

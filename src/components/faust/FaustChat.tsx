@@ -58,6 +58,7 @@ function FaustMarkdown({ content, existenceLinks }: { content: string; existence
 
 export function FaustChat() {
   const [open, setOpen] = useState(false);
+  const [hiddenByOtherWindow, setHiddenByOtherWindow] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -73,10 +74,19 @@ export function FaustChat() {
   useEffect(() => { if (open) messageEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy, open]);
   useEffect(() => {
     const closeForOtherWindow = (event: Event) => {
-      if ((event as CustomEvent<{ window?: string }>).detail?.window !== "faust") setOpen(false);
+      const otherWindowOpen = (event as CustomEvent<{ window?: string }>).detail?.window !== "faust";
+      setHiddenByOtherWindow(otherWindowOpen);
+      if (otherWindowOpen) setOpen(false);
+    };
+    const restoreAfterOtherWindowCloses = (event: Event) => {
+      if ((event as CustomEvent<{ window?: string }>).detail?.window !== "faust") setHiddenByOtherWindow(false);
     };
     window.addEventListener("eros-floating-window-open", closeForOtherWindow);
-    return () => window.removeEventListener("eros-floating-window-open", closeForOtherWindow);
+    window.addEventListener("eros-floating-window-close", restoreAfterOtherWindowCloses);
+    return () => {
+      window.removeEventListener("eros-floating-window-open", closeForOtherWindow);
+      window.removeEventListener("eros-floating-window-close", restoreAfterOtherWindowCloses);
+    };
   }, []);
   useEffect(() => {
     if (!open) return;
@@ -155,6 +165,7 @@ export function FaustChat() {
     setMessages([initialMessage]); setDraft(""); setSelected([]); setPickerOpen(false); setSearch(""); setError("");
   }
 
+  if (!open && hiddenByOtherWindow) return null;
   if (!open) return <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent("eros-floating-window-open", { detail: { window: "faust" } })); setOpen(true); }} aria-label="展开浮士德对话"
     className="fixed left-2 top-[46%] z-[70] flex min-h-12 items-center gap-2 rounded-r-full border border-l-0 border-amber-200/20 bg-[#17130f]/95 py-2 pl-2 pr-4 text-sm text-amber-100 shadow-2xl backdrop-blur-xl sm:left-0">
     <span className="grid h-8 w-8 place-items-center rounded-full border border-amber-200/30 bg-amber-100/10 font-serif text-lg">F</span>
@@ -166,7 +177,7 @@ export function FaustChat() {
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-amber-200/25 bg-amber-100/10 font-serif text-xl text-amber-100">F</span>
       <div className="min-w-0 flex-1"><h2 className="font-serif text-lg text-amber-50">浮士德</h2><p className="text-[11px] tracking-[.12em] text-amber-100/45">EROS 史诗的讲述者</p></div>
       <button type="button" onClick={resetSession} disabled={busy} aria-label="重置浮士德对话" className="min-h-9 rounded-full border border-white/10 px-3 text-xs text-slate-400 hover:border-amber-100/20 hover:text-amber-100 disabled:opacity-30">重置</button>
-      <button type="button" onClick={() => setOpen(false)} aria-label="收起浮士德对话" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xl text-slate-400 hover:text-white">‹</button>
+      <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent("eros-floating-window-close", { detail: { window: "faust" } })); }} aria-label="收起浮士德对话" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xl text-slate-400 hover:text-white">‹</button>
     </header>
 
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-4" aria-live="polite">
