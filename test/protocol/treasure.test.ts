@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   TREASURE_MATCH_THRESHOLD,
   TREASURE_SUBJECTS,
+  addTreasureInstanceNumber,
   createExistenceFeature,
   createTreasureName,
   decodeTreasure,
@@ -53,5 +54,7 @@ describe("Eros treasure protocol", () => {
     expect(first.tokens).toHaveLength(15);
     expect(new Set(first.tokens.map(({ family }) => family)).size).toBe(15);
     expect(createTreasureName("Gaia", first.subjectName)).toBe("【Gaia】的【宝珠】");
+    expect(addTreasureInstanceNumber("【Gaia】的【宝珠】", 1)).toBe("【Gaia】的【宝珠】");
+    expect(addTreasureInstanceNumber("【Gaia】的【宝珠】", 2)).toBe("【Gaia】的【宝珠】（2）");
   });
 });

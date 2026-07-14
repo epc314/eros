@@ -185,3 +185,8 @@ export function buildTreasureImagePrompt(subjectName: string, ownerName: string,
 export function createTreasureName(ownerName: string, subjectName: string): string {
   return `【${ownerName}】的【${subjectName}】`;
 }
+
+export function addTreasureInstanceNumber(baseName: string, instanceNumber: number): string {
+  if (!Number.isInteger(instanceNumber) || instanceNumber < 1) throw new RangeError("Treasure instance number must be a positive integer");
+  return instanceNumber === 1 ? baseName : `${baseName}（${instanceNumber}）`;
+}

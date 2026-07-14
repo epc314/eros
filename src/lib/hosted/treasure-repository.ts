@@ -1,5 +1,5 @@
 import { ApiFailure } from "../api";
-import { TREASURE_PROTOCOL_VERSION, type TreasureToken } from "../treasure/protocol";
+import { TREASURE_PROTOCOL_VERSION, addTreasureInstanceNumber, type TreasureToken } from "../treasure/protocol";
 import { getHostedEnv } from "./env";
 import { ensureHostedSchema, WORLD_ID } from "./repository";
 
@@ -16,6 +16,7 @@ export interface HostedTreasure {
   subjectIndex: number;
   subjectName: string;
   subjectGroup: string;
+  instanceNumber: number;
   searchTimestampMs: string;
   searchAttempt: number;
   searchHashHex: string;
@@ -70,7 +71,7 @@ const newId = () => crypto.randomUUID();
 
 const treasureColumns = `t.id,t.world_id AS worldId,t.owner_node_id AS ownerNodeId,n.name AS ownerName,
   t.protocol_version AS protocolVersion,t.name,t.subject_index AS subjectIndex,t.subject_name AS subjectName,
-  t.subject_group AS subjectGroup,t.search_timestamp_ms AS searchTimestampMs,t.search_attempt AS searchAttempt,
+  t.subject_group AS subjectGroup,t.instance_number AS instanceNumber,t.search_timestamp_ms AS searchTimestampMs,t.search_attempt AS searchAttempt,
   t.search_hash_hex AS searchHashHex,t.match_score AS matchScore,t.owner_feature_hex AS ownerFeatureHex,
   t.tokens_json AS tokensJson,t.exact_prompt AS exactPrompt,t.recorder_name AS recorderName,
   t.status,t.created_at AS createdAt,t.collected_at AS collectedAt`;
@@ -112,28 +113,35 @@ export async function createOrGetTreasureCandidate(input: TreasureCandidateInput
   const owner = await first<{ id: string }>(db().prepare("SELECT id FROM nodes WHERE id=? AND world_id=?").bind(input.ownerNodeId, WORLD_ID));
   if (!owner) throw new ApiFailure("NODE_NOT_FOUND", "匹配到的存在已经不在这个世界中。", 404);
   const existing = await first<HostedTreasure>(db().prepare(`SELECT ${treasureColumns} FROM treasures t JOIN nodes n ON n.id=t.owner_node_id
-    WHERE t.owner_node_id=? AND t.subject_index=?`).bind(input.ownerNodeId, input.subjectIndex));
+    WHERE t.owner_node_id=? AND t.search_hash_hex=?`).bind(input.ownerNodeId, input.searchHashHex));
   if (existing) return { treasure: existing, created: false };
-  const id = newId();
   const createdAt = new Date().toISOString();
-  try {
-    await db().prepare(`INSERT INTO treasures
-      (id,world_id,owner_node_id,protocol_version,name,subject_index,subject_name,subject_group,search_timestamp_ms,
-       search_attempt,search_hash_hex,match_score,owner_feature_hex,tokens_json,exact_prompt,status,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
-      id, WORLD_ID, input.ownerNodeId, TREASURE_PROTOCOL_VERSION, input.name, input.subjectIndex, input.subjectName,
-      input.subjectGroup, input.searchTimestampMs, input.searchAttempt, input.searchHashHex, input.matchScore,
-      input.ownerFeatureHex, JSON.stringify(input.tokens), input.exactPrompt, "PENDING", createdAt,
-    ).run();
-  } catch (error) {
-    const raced = await first<HostedTreasure>(db().prepare(`SELECT ${treasureColumns} FROM treasures t JOIN nodes n ON n.id=t.owner_node_id
-      WHERE t.owner_node_id=? AND t.subject_index=?`).bind(input.ownerNodeId, input.subjectIndex));
-    if (raced) return { treasure: raced, created: false };
-    throw error;
+  for (let retry = 0; retry < 4; retry += 1) {
+    const sequence = await first<{ instanceNumber: number }>(db().prepare(`SELECT COALESCE(MAX(instance_number),0)+1 AS instanceNumber
+      FROM treasures WHERE owner_node_id=? AND subject_index=?`).bind(input.ownerNodeId, input.subjectIndex));
+    const instanceNumber = Number(sequence?.instanceNumber ?? 1);
+    const id = newId();
+    const name = addTreasureInstanceNumber(input.name, instanceNumber);
+    try {
+      await db().prepare(`INSERT INTO treasures
+        (id,world_id,owner_node_id,protocol_version,name,subject_index,subject_name,subject_group,instance_number,search_timestamp_ms,
+         search_attempt,search_hash_hex,match_score,owner_feature_hex,tokens_json,exact_prompt,status,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+        id, WORLD_ID, input.ownerNodeId, TREASURE_PROTOCOL_VERSION, name, input.subjectIndex, input.subjectName,
+        input.subjectGroup, instanceNumber, input.searchTimestampMs, input.searchAttempt, input.searchHashHex, input.matchScore,
+        input.ownerFeatureHex, JSON.stringify(input.tokens), input.exactPrompt, "PENDING", createdAt,
+      ).run();
+      const treasure = await getTreasureInternal(id);
+      if (!treasure) throw new ApiFailure("TREASURE_CREATION_FAILED", "宝物候选未能成形。", 500);
+      return { treasure, created: true };
+    } catch (error) {
+      const raced = await first<HostedTreasure>(db().prepare(`SELECT ${treasureColumns} FROM treasures t JOIN nodes n ON n.id=t.owner_node_id
+        WHERE t.owner_node_id=? AND t.search_hash_hex=?`).bind(input.ownerNodeId, input.searchHashHex));
+      if (raced) return { treasure: raced, created: false };
+      if (retry === 3) throw error;
+    }
   }
-  const treasure = await getTreasureInternal(id);
-  if (!treasure) throw new ApiFailure("TREASURE_CREATION_FAILED", "宝物候选未能成形。", 500);
-  return { treasure, created: true };
+  throw new ApiFailure("TREASURE_CREATION_FAILED", "宝物候选未能成形。", 500);
 }
 
 export async function getTreasureInternal(id: string): Promise<HostedTreasure | null> {
@@ -144,8 +152,8 @@ export async function getTreasureInternal(id: string): Promise<HostedTreasure | 
 export async function listCollectedTreasures(query?: string) {
   await ensureHostedSchema();
   const normalized = query?.trim();
-  const where = normalized ? "AND (t.name LIKE ? OR n.name LIKE ? OR t.id LIKE ?)" : "";
-  const values = normalized ? [`%${normalized}%`, `%${normalized}%`, `${normalized.toLowerCase()}%`] : [];
+  const where = normalized ? "AND (t.name LIKE ? OR n.name LIKE ? OR t.search_hash_hex LIKE ? OR t.id LIKE ?)" : "";
+  const values = normalized ? [`%${normalized}%`, `%${normalized}%`, `${normalized.toLowerCase()}%`, `${normalized.toLowerCase()}%`] : [];
   const rows = await all<HostedTreasure & { descriptionCount: number; imageCount: number }>(db().prepare(`SELECT ${treasureColumns},
     (SELECT COUNT(*) FROM treasure_descriptions d WHERE d.treasure_id=t.id AND d.status='VISIBLE') AS descriptionCount,
     (SELECT COUNT(*) FROM treasure_images i WHERE i.treasure_id=t.id AND i.status='COMPLETED') AS imageCount
@@ -164,6 +172,8 @@ export async function listCollectedTreasures(query?: string) {
     subjectIndex: treasure.subjectIndex,
     subjectName: treasure.subjectName,
     subjectGroup: treasure.subjectGroup,
+    instanceNumber: treasure.instanceNumber,
+    searchHashHex: treasure.searchHashHex,
     recorderName: treasure.recorderName,
     status: treasure.status,
     createdAt: treasure.createdAt,
@@ -189,6 +199,7 @@ export async function listNodeTreasures(nodeId: string) {
     subjectIndex: treasure.subjectIndex,
     subjectName: treasure.subjectName,
     subjectGroup: treasure.subjectGroup,
+    instanceNumber: treasure.instanceNumber,
     recorderName: treasure.recorderName,
     status: treasure.status,
     createdAt: treasure.createdAt,

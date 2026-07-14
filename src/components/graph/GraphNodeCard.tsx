@@ -33,6 +33,7 @@ export function GraphNodeCard({ data, selected }: NodeProps) {
     <div className="px-4 py-3">
       <h3 className="truncate text-xl font-semibold tracking-tight text-white">{item.name}</h3>
       <div className="mt-2 flex items-center justify-between gap-3"><span className="truncate text-xs font-medium text-cyan-100">{item.primaryEntityZh}</span><span className="shrink-0 text-[11px] text-slate-400">{item.imageCount} 图 · {item.descriptionCount} 记述</span></div>
+      <div className="mt-2 border-t border-white/[.06] pt-2 text-right"><code className="hash text-[10px] tracking-[.12em] text-slate-600">{item.genomeHex.slice(0, 8)}</code></div>
     </div>
     <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-fuchsia-400" />
   </article>;

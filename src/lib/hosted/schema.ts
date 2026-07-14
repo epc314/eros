@@ -58,11 +58,13 @@ export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS treasures (
     id TEXT PRIMARY KEY, world_id TEXT NOT NULL, owner_node_id TEXT NOT NULL,
     protocol_version TEXT NOT NULL, name TEXT NOT NULL, subject_index INTEGER NOT NULL,
-    subject_name TEXT NOT NULL, subject_group TEXT NOT NULL, search_timestamp_ms TEXT NOT NULL,
+    subject_name TEXT NOT NULL, subject_group TEXT NOT NULL, instance_number INTEGER NOT NULL DEFAULT 1,
+    search_timestamp_ms TEXT NOT NULL,
     search_attempt INTEGER NOT NULL, search_hash_hex TEXT NOT NULL, match_score INTEGER NOT NULL,
     owner_feature_hex TEXT NOT NULL, tokens_json TEXT NOT NULL, exact_prompt TEXT NOT NULL,
     recorder_name TEXT, status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COLLECTED')),
-    created_at TEXT NOT NULL, collected_at TEXT, UNIQUE(owner_node_id, subject_index),
+    created_at TEXT NOT NULL, collected_at TEXT,
+    UNIQUE(owner_node_id, subject_index, instance_number), UNIQUE(owner_node_id, search_hash_hex),
     FOREIGN KEY(world_id) REFERENCES worlds(id), FOREIGN KEY(owner_node_id) REFERENCES nodes(id)
   )`,
   `CREATE INDEX IF NOT EXISTS treasures_world_status_created_idx ON treasures(world_id, status, created_at)`,
