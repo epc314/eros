@@ -330,6 +330,41 @@ export async function listTreasureImages(treasureId: string) {
     WHERE treasure_id=? ORDER BY is_primary DESC,created_at DESC`).bind(treasureId))).map(normalizeImage);
 }
 
+export async function clearHostedTreasures() {
+  await ensureHostedSchema();
+  const countStatements = [
+    db().prepare("SELECT COUNT(*) AS total FROM treasures WHERE world_id=?").bind(WORLD_ID),
+    db().prepare("SELECT COUNT(*) AS total FROM treasure_descriptions WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?)").bind(WORLD_ID),
+    db().prepare(`SELECT COUNT(*) AS total FROM treasure_description_feedback WHERE description_id IN
+      (SELECT id FROM treasure_descriptions WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?))`).bind(WORLD_ID),
+    db().prepare("SELECT COUNT(*) AS total FROM treasure_images WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?)").bind(WORLD_ID),
+  ];
+  const [counts, imageRows] = await Promise.all([
+    db().batch(countStatements),
+    all<{ r2Key: string | null }>(db().prepare(`SELECT r2_key AS r2Key FROM treasure_images
+      WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?) AND r2_key IS NOT NULL`).bind(WORLD_ID)),
+  ]);
+  const total = (index: number) => Number((counts[index].results[0] as { total?: number } | undefined)?.total ?? 0);
+  const deleted = {
+    treasures: total(0),
+    descriptions: total(1),
+    feedback: total(2),
+    images: total(3),
+    storedImages: new Set(imageRows.map(({ r2Key }) => r2Key).filter((key): key is string => Boolean(key))).size,
+  };
+  await db().batch([
+    db().prepare(`DELETE FROM treasure_description_feedback WHERE description_id IN
+      (SELECT id FROM treasure_descriptions WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?))`).bind(WORLD_ID),
+    db().prepare("DELETE FROM treasure_descriptions WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?)").bind(WORLD_ID),
+    db().prepare("DELETE FROM treasure_images WHERE treasure_id IN (SELECT id FROM treasures WHERE world_id=?)").bind(WORLD_ID),
+    db().prepare("DELETE FROM treasures WHERE world_id=?").bind(WORLD_ID),
+  ]);
+  const r2Keys = [...new Set(imageRows.map(({ r2Key }) => r2Key).filter((key): key is string => Boolean(key)))];
+  for (let index = 0; index < r2Keys.length; index += 1_000)
+    await getHostedEnv().EROS_IMAGES.delete(r2Keys.slice(index, index + 1_000));
+  return { cleared: true, deleted };
+}
+
 export async function hostedTreasureContext(): Promise<{ text: string; names: string[] }> {
   const treasures = await listCollectedTreasures();
   if (!treasures.length) return { text: "当前尚无已收录宝物。", names: [] };
