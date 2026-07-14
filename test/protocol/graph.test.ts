@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
-import { buildPedigreeGraph, layoutGraph } from "@/lib/graph/layout";
+import { buildRadialGraph, GRAPH_NODE_HEIGHT, GRAPH_NODE_WIDTH } from "@/lib/graph/layout";
 import { ancestorIds, descendantIds } from "@/lib/graph/traversal";
 
 const edges = [
@@ -13,23 +13,31 @@ describe("graph traversal", () => {
   it("finds all descendants", () => expect([...descendantIds("a", edges)].sort()).toEqual(["a", "c", "d"]));
 });
 
-describe("generation layout", () => {
-  it("keeps one stable row per generation and sorts names within a row", () => {
+function polar(node: Node<Record<string, unknown>>) {
+  const x = node.position.x + GRAPH_NODE_WIDTH / 2;
+  const y = node.position.y + GRAPH_NODE_HEIGHT / 2;
+  return { radius: Math.hypot(x, y), angle: Math.atan2(y, x) };
+}
+
+describe("radial generation layout", () => {
+  it("keeps each generation on a stable concentric ring", () => {
     const nodes = [
       { id: "root-b", data: { name: "Beta", generation: 0 } },
       { id: "child", data: { name: "Child", generation: 1 } },
       { id: "root-a", data: { name: "Alpha", generation: 0 } },
     ].map((node) => ({ ...node, position: { x: 0, y: 0 } })) as Node<Record<string, unknown>>[];
-    const result = layoutGraph(nodes, []);
-    const rootA = result.find(({ id }) => id === "root-a")!;
-    const rootB = result.find(({ id }) => id === "root-b")!;
-    const child = result.find(({ id }) => id === "child")!;
-    expect(rootA.position.y).toBe(rootB.position.y);
-    expect(child.position.y).toBeGreaterThan(rootA.position.y);
-    expect(rootA.position.x).toBeLessThan(rootB.position.x);
+    const first = buildRadialGraph(nodes, []);
+    const second = buildRadialGraph(nodes, []);
+    const rootA = first.nodes.find(({ id }) => id === "root-a")!;
+    const rootB = first.nodes.find(({ id }) => id === "root-b")!;
+    const child = first.nodes.find(({ id }) => id === "child")!;
+    expect(polar(rootA).radius).toBeCloseTo(polar(rootB).radius);
+    expect(polar(child).radius).toBeGreaterThan(polar(rootA).radius);
+    expect(first.nodes.map(({ position }) => position)).toEqual(second.nodes.map(({ position }) => position));
+    expect(first.rings.map(({ generation }) => generation)).toEqual([0, 1]);
   });
 
-  it("keeps descendants near their parents instead of centering every row independently", () => {
+  it("places descendants near the circular mean of their parents", () => {
     const nodes = [
       { id: "a", data: { name: "A", generation: 0 } },
       { id: "b", data: { name: "B", generation: 0 } },
@@ -41,15 +49,16 @@ describe("generation layout", () => {
       { id: "a-child", source: "a", target: "child" },
       { id: "b-child", source: "b", target: "child" },
     ] as Edge[];
-    const result = layoutGraph(nodes, relations);
-    const parentCenters = result.filter(({ id }) => id === "a" || id === "b").map(({ position }) => position.x + 134);
-    const child = result.find(({ id }) => id === "child")!;
-    expect(child.position.x + 134).toBeCloseTo((parentCenters[0] + parentCenters[1]) / 2);
+    const result = buildRadialGraph(nodes, relations);
+    const parentAngles = result.nodes.filter(({ id }) => id === "a" || id === "b").map((node) => polar(node).angle);
+    const expected = Math.atan2(parentAngles.map(Math.sin).reduce((sum, value) => sum + value), parentAngles.map(Math.cos).reduce((sum, value) => sum + value));
+    const child = result.nodes.find(({ id }) => id === "child")!;
+    expect(polar(child).angle).toBeCloseTo(expected);
   });
 });
 
-describe("pedigree presentation", () => {
-  it("merges two parent branches before drawing one descent line and has no edge labels", () => {
+describe("radial relation presentation", () => {
+  it("routes direct curved relations through directional handles without labels", () => {
     const nodes = [
       { id: "a", data: { name: "A", generation: 0 } },
       { id: "b", data: { name: "B", generation: 0 } },
@@ -59,11 +68,12 @@ describe("pedigree presentation", () => {
       { id: "a-child", source: "a", target: "child" },
       { id: "b-child", source: "b", target: "child" },
     ] as Edge[];
-    const graph = buildPedigreeGraph(layoutGraph(nodes, relations), relations);
-    const junction = graph.nodes.find(({ type }) => type === "junction")!;
-    expect(junction).toBeTruthy();
-    expect(graph.edges.filter(({ target }) => target === junction.id)).toHaveLength(2);
-    expect(graph.edges.filter(({ source, target }) => source === junction.id && target === "child")).toHaveLength(1);
+    const graph = buildRadialGraph(nodes, relations);
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.edges).toHaveLength(2);
     expect(graph.edges.every((edge) => edge.label === undefined)).toBe(true);
+    expect(graph.edges.every((edge) => edge.type === "default")).toBe(true);
+    expect(graph.edges.every((edge) => /^source-(top|right|bottom|left)-[ab]$/.test(edge.sourceHandle ?? ""))).toBe(true);
+    expect(graph.edges.every((edge) => /^target-(top|right|bottom|left)-[ab]$/.test(edge.targetHandle ?? ""))).toBe(true);
   });
 });

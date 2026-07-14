@@ -4,6 +4,18 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { prefetchExistenceDetail } from "../node/NodeDetailPanel";
 
+const RADIAL_HANDLES = [
+  { side: "top", position: Position.Top },
+  { side: "right", position: Position.Right },
+  { side: "bottom", position: Position.Bottom },
+  { side: "left", position: Position.Left },
+] as const;
+
+function radialHandleStyle(side: typeof RADIAL_HANDLES[number]["side"], lane: "a" | "b") {
+  const offset = lane === "a" ? "40%" : "60%";
+  return side === "top" || side === "bottom" ? { left: offset } : { top: offset };
+}
+
 export interface ErosNodeData extends Record<string, unknown> {
   name: string;
   id: string;
@@ -25,7 +37,10 @@ export interface ErosNodeData extends Record<string, unknown> {
 export function GraphNodeCard({ data, selected }: NodeProps) {
   const item = data as ErosNodeData;
   return <article aria-label={`${item.name} · ${item.primaryEntityZh}`} onPointerEnter={() => prefetchExistenceDetail(item.id)} onPointerDown={() => prefetchExistenceDetail(item.id)} className={`w-[268px] overflow-hidden rounded-2xl border shadow-2xl transition ${item.isDead ? "border-slate-500/30 bg-[#20242c] grayscale" : "bg-[#111827]"} ${selected ? "border-cyan-400 shadow-cyan-500/20" : "border-white/10"}`}>
-    <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-cyan-400" />
+    {RADIAL_HANDLES.flatMap(({ side, position }) => (["a", "b"] as const).flatMap((lane) => [
+      <Handle key={`target-${side}-${lane}`} id={`target-${side}-${lane}`} type="target" position={position} style={radialHandleStyle(side, lane)} className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0" />,
+      <Handle key={`source-${side}-${lane}`} id={`source-${side}-${lane}`} type="source" position={position} style={radialHandleStyle(side, lane)} className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0" />,
+    ]))}
     <div className="relative h-[188px] overflow-hidden bg-slate-950">
       {item.image ? <img src={item.image} alt={`${item.name} 的视觉解释`} width={512} height={320} loading="lazy" decoding="async" fetchPriority="low" className="h-full w-full object-contain" /> : <div className="h-full bg-[radial-gradient(circle_at_50%_45%,#164e63,#111827_55%,#020617)]" />}
       {item.selectedAs && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-fuchsia-500 text-xs font-bold">{item.selectedAs}</span>}
@@ -35,7 +50,5 @@ export function GraphNodeCard({ data, selected }: NodeProps) {
       <div className="mt-2 flex items-center justify-between gap-3"><span className="truncate text-xs font-medium text-cyan-100">{item.primaryEntityZh}</span><span className="shrink-0 text-[11px] text-slate-400">{item.imageCount} 图 · {item.descriptionCount} 记述</span></div>
       <div className="mt-2 border-t border-white/[.06] pt-2 text-right"><code className="hash text-[10px] tracking-[.12em] text-slate-600">{item.genomeHex.slice(0, 8)}</code></div>
     </div>
-    <Handle id="lineage-left" type="source" position={Position.Bottom} style={{ left: "38%" }} className="!h-1.5 !w-1.5 !border-0 !bg-fuchsia-400" />
-    <Handle id="lineage-right" type="source" position={Position.Bottom} style={{ left: "62%" }} className="!h-1.5 !w-1.5 !border-0 !bg-fuchsia-400" />
   </article>;
 }
