@@ -31,9 +31,9 @@ function LikeButton({ post, onLike, busy }: { post: ProposalSummary; onLike: (id
 }
 
 function ProposalRow({ post, onOpen, onLike, liking }: { post: ProposalSummary; onOpen: (id: string) => void; onLike: (id: string) => void; liking: boolean }) {
-  return <article className="group rounded-2xl border border-white/10 bg-black/20 p-3 text-left transition hover:border-violet-200/20 hover:bg-white/[.045]">
-    <button type="button" onClick={() => onOpen(post.id)} className="block w-full text-left"><h3 className="line-clamp-2 font-serif text-[15px] font-semibold leading-6 text-slate-100 group-hover:text-violet-100">{post.title}</h3></button>
-    <div className="mt-2 flex items-end justify-between gap-3">
+  return <article className="group rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-left transition hover:border-violet-200/20 hover:bg-white/[.045]">
+    <button type="button" onClick={() => onOpen(post.id)} className="block w-full text-left"><h3 className="line-clamp-2 font-serif text-[15px] font-semibold leading-5 text-slate-100 group-hover:text-violet-100">{post.title}</h3></button>
+    <div className="mt-1.5 flex items-end justify-between gap-3">
       <NarratorIdentity narrator={post.author} className="min-w-0 text-[11px]" />
       <div className="flex shrink-0 items-center gap-1.5"><span className="text-[10px] text-slate-600">{post.replyCount} 回复</span><LikeButton post={post} onLike={onLike} busy={liking} /></div>
     </div>
@@ -224,19 +224,19 @@ export function ProposalStone() {
     {view !== "list" && <button type="button" onClick={() => { setView("list"); setError(""); void loadList(sort); }} className="absolute left-3 top-3 z-20 min-h-8 rounded-full border border-white/10 bg-[#171421]/95 px-3 text-[11px] text-slate-400 shadow-lg backdrop-blur-xl hover:text-white">返回</button>}
 
     {view === "list" && <>
-      <div className="shrink-0 border-b border-violet-100/10 px-3 py-3">
+      <div className="shrink-0 border-b border-violet-100/10 px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="grid flex-1 grid-cols-2 rounded-xl bg-black/25 p-1 text-xs"><button type="button" onClick={() => setSort("latest")} className={`min-h-9 rounded-lg ${sort === "latest" ? "bg-violet-100/10 text-violet-100" : "text-slate-500"}`}>最新</button><button type="button" onClick={() => setSort("likes")} className={`min-h-9 rounded-lg ${sort === "likes" ? "bg-violet-100/10 text-violet-100" : "text-slate-500"}`}>点赞</button></div>
           <button type="button" onClick={() => narrator ? setView("create") : openAuthentication()} className="min-h-11 rounded-xl bg-violet-100 px-3 text-xs font-semibold text-[#15101d]">刻下建言</button>
         </div>
         {!narrator && <button type="button" onClick={openAuthentication} className="mt-2 w-full text-left text-[10px] text-violet-200/55 hover:text-violet-100">登录记述者账户后即可发布建言与回复。</button>}
-        {activePinned && <section className="mt-3 rounded-2xl border border-amber-200/15 bg-amber-100/[.035] p-2.5" aria-label="置顶建言">
-          <div className="mb-2 flex items-center justify-between text-[9px] uppercase tracking-[.2em] text-amber-200/55"><span>置顶建言</span><span>{pinnedIndex + 1} / {pinned.length}</span></div>
-          <div className="flex items-center gap-2"><button type="button" disabled={pinned.length < 2} onClick={() => setPinnedIndex((pinnedIndex - 1 + pinned.length) % pinned.length)} aria-label="上一条置顶建言" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 text-slate-500 disabled:opacity-20">‹</button><div className="min-w-0 flex-1"><ProposalRow post={activePinned} onOpen={openProposal} onLike={toggleLike} liking={likingId === activePinned.id} /></div><button type="button" disabled={pinned.length < 2} onClick={() => setPinnedIndex((pinnedIndex + 1) % pinned.length)} aria-label="下一条置顶建言" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 text-slate-500 disabled:opacity-20">›</button></div>
+        {activePinned && <section className="mt-2.5 rounded-2xl border border-amber-200/15 bg-amber-100/[.035] px-2.5 py-2" aria-label="置顶建言">
+          <div className="mb-1.5 flex items-center justify-between px-0.5 text-[9px] uppercase tracking-[.2em] text-amber-200/55"><span>置顶建言</span><span>{pinnedIndex + 1} / {pinned.length}</span></div>
+          <div className="flex items-center gap-1.5"><button type="button" disabled={pinned.length < 2} onClick={() => setPinnedIndex((pinnedIndex - 1 + pinned.length) % pinned.length)} aria-label="上一条置顶建言" className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 text-slate-500 disabled:opacity-20">‹</button><div className="min-w-0 flex-1"><ProposalRow post={activePinned} onOpen={openProposal} onLike={toggleLike} liking={likingId === activePinned.id} /></div><button type="button" disabled={pinned.length < 2} onClick={() => setPinnedIndex((pinnedIndex + 1) % pinned.length)} aria-label="下一条置顶建言" className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 text-slate-500 disabled:opacity-20">›</button></div>
         </section>}
       </div>
-      <div ref={listScroller} onScroll={(event) => { const element = event.currentTarget; if (sort === "latest" && element.scrollTop < 48) void loadMore(); else if (sort === "likes" && element.scrollHeight - element.scrollTop - element.clientHeight < 80) void loadMore(); }} className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className={`flex min-h-full flex-col gap-2 ${sort === "latest" ? "justify-end" : "justify-start"}`}>
+      <div ref={listScroller} onScroll={(event) => { const element = event.currentTarget; if (sort === "latest" && element.scrollTop < 48) void loadMore(); else if (sort === "likes" && element.scrollHeight - element.scrollTop - element.clientHeight < 80) void loadMore(); }} className="min-h-0 flex-1 overflow-y-auto p-2.5">
+        <div className={`flex min-h-full flex-col gap-1.5 ${sort === "latest" ? "justify-end" : "justify-start"}`}>
           {sort === "latest" && hasMore && <button type="button" disabled={loadingMore} onClick={() => void loadMore()} className="py-2 text-[10px] text-violet-200/45">{loadingMore ? "正在读取旧建言……" : "向上滑动查看更多先前建言"}</button>}
           {!busy && !posts.length && <div className="grid flex-1 place-items-center py-10 text-center text-xs leading-6 text-slate-600">石面尚且空白。<br />等待第一条建言。</div>}
           {posts.map((post) => <ProposalRow key={post.id} post={post} onOpen={openProposal} onLike={toggleLike} liking={likingId === post.id} />)}
