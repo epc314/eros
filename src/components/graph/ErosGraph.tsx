@@ -11,6 +11,7 @@ import { NodeDetailPanel } from "../node/NodeDetailPanel";
 import { ReproductionPanel } from "../reproduction/ReproductionPanel";
 import { TreasureAtlas } from "../treasure/TreasureAtlas";
 import { RadialGraphBackdrop } from "./RadialGraphBackdrop";
+import { EROS_PAGE_READY_EVENT, EROS_PAGE_READY_KEY } from "../floating/page-ready";
 
 const nodeTypes = { eros: GraphNodeCard } satisfies NodeTypes;
 
@@ -40,6 +41,40 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
     update(); media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+  useEffect(() => {
+    if (!payload && !failure) return;
+    let cancelled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let timeout = 0;
+    const announceReady = async () => {
+      await document.fonts.ready.catch(() => undefined);
+      firstFrame = window.requestAnimationFrame(() => {
+        const pendingImages = [...document.querySelectorAll<HTMLImageElement>(".react-flow img")]
+          .filter((image) => !image.complete)
+          .map((image) => image.decode().catch(() => undefined));
+        const imageWait = Promise.all(pendingImages);
+        const timeoutWait = new Promise<void>((resolve) => { timeout = window.setTimeout(resolve, 8_000); });
+        void Promise.race([imageWait, timeoutWait]).then(() => {
+          window.clearTimeout(timeout);
+          if (cancelled) return;
+          secondFrame = window.requestAnimationFrame(() => {
+            if (cancelled) return;
+            document.documentElement.dataset[EROS_PAGE_READY_KEY] = "true";
+            window.dispatchEvent(new Event(EROS_PAGE_READY_EVENT));
+          });
+        });
+      });
+    };
+    void announceReady();
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      window.clearTimeout(timeout);
+      delete document.documentElement.dataset[EROS_PAGE_READY_KEY];
+    };
+  }, [failure, payload]);
 
   const nodeById = useMemo(() => new Map(payload?.nodes.map((node) => [node.id, node]) ?? []), [payload]);
   useEffect(() => {
