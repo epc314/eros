@@ -62,7 +62,7 @@ export function ProposalStone() {
   const [likingId, setLikingId] = useState("");
   const [error, setError] = useState("");
   const listScroller = useRef<HTMLDivElement>(null);
-  const messageEnd = useRef<HTMLDivElement>(null);
+  const replyScroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let key = window.localStorage.getItem("eros-proposal-voter");
@@ -105,7 +105,13 @@ export function ProposalStone() {
   }, [voterKey]);
 
   useEffect(() => { if (open && view === "list") void loadList(sort); }, [loadList, narrator?.id, open, sort, view]);
-  useEffect(() => { if (view === "detail") messageEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [replies, view]);
+  useEffect(() => {
+    if (view !== "detail") return;
+    window.requestAnimationFrame(() => {
+      const scroller = replyScroller.current;
+      if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    });
+  }, [replies, view]);
 
   async function loadMore() {
     if (!cursor || !hasMore || loadingMore || !voterKey) return;
@@ -213,12 +219,12 @@ export function ProposalStone() {
 
   if (!open && hiddenByOtherWindow) return null;
   if (!open) return <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent("eros-floating-window-open", { detail: { window: "proposal-stone" } })); setOpen(true); }} aria-label="展开建言石"
-    className="fixed right-0 top-[42%] z-[68] flex flex-col items-center rounded-l-xl border border-r-0 border-violet-200/20 bg-[#171421]/95 px-1.5 py-2 font-serif text-xs leading-4 text-violet-100 shadow-xl backdrop-blur-xl md:right-[414px]">
+    className="fixed right-0 top-1/2 z-[68] flex -translate-y-1/2 flex-col items-center rounded-l-xl border border-r-0 border-violet-200/20 bg-[#171421]/95 px-1.5 py-2 font-serif text-xs leading-4 text-violet-100 shadow-xl backdrop-blur-xl md:right-[414px]">
     <span>建</span><span>言</span><span>石</span>
   </button>;
 
   const activePinned = pinned[pinnedIndex];
-  return <aside aria-label="建言石" className="fixed bottom-2 left-2 right-2 top-16 z-[68] min-h-0 md:bottom-auto md:left-auto md:right-[414px] md:top-[24%] md:h-[min(620px,66vh)] md:w-[370px]">
+  return <aside aria-label="建言石" onWheel={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} className="nodrag nopan nowheel fixed bottom-2 left-2 right-2 top-16 z-[68] min-h-0 overscroll-contain md:bottom-auto md:left-auto md:right-[414px] md:top-[24%] md:h-[min(620px,66vh)] md:w-[370px]">
     <button type="button" onClick={closeStone} aria-label="收起建言石" className="absolute left-0 top-1/2 z-20 grid h-14 w-6 -translate-y-1/2 place-items-center rounded-r-full border border-l-0 border-violet-100/15 bg-[#171421]/95 text-base text-violet-100/60 shadow-lg backdrop-blur-xl transition hover:text-violet-50 md:-translate-x-1/2 md:rounded-full md:border-l">›</button>
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-violet-100/15 bg-[#100e18]/[.97] shadow-2xl shadow-black/70 backdrop-blur-2xl">
     {view !== "list" && <button type="button" onClick={() => { setView("list"); setError(""); void loadList(sort); }} className="absolute left-3 top-3 z-20 min-h-8 rounded-full border border-white/10 bg-[#171421]/95 px-3 text-[11px] text-slate-400 shadow-lg backdrop-blur-xl hover:text-white">返回</button>}
@@ -237,7 +243,7 @@ export function ProposalStone() {
           <span className="pointer-events-none absolute -bottom-2 right-1 z-10 bg-[#100e18] px-1.5 text-[9px] tracking-[.16em] text-amber-200/55">{pinnedIndex + 1} / {pinned.length}</span>
         </section>}
       </div>
-      <div ref={listScroller} onScroll={(event) => { const element = event.currentTarget; if (sort === "latest" && element.scrollTop < 48) void loadMore(); else if (sort === "likes" && element.scrollHeight - element.scrollTop - element.clientHeight < 80) void loadMore(); }} className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div ref={listScroller} onScroll={(event) => { const element = event.currentTarget; if (sort === "latest" && element.scrollTop < 48) void loadMore(); else if (sort === "likes" && element.scrollHeight - element.scrollTop - element.clientHeight < 80) void loadMore(); }} className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-2">
         <div className={`flex min-h-full flex-col gap-1.5 ${sort === "latest" ? "justify-end" : "justify-start"}`}>
           {sort === "latest" && hasMore && <button type="button" disabled={loadingMore} onClick={() => void loadMore()} className="py-2 text-[10px] text-violet-200/45">{loadingMore ? "正在读取旧建言……" : "向上滑动查看更多先前建言"}</button>}
           {!busy && !posts.length && <div className="grid flex-1 place-items-center py-10 text-center text-xs leading-6 text-slate-600">石面尚且空白。<br />等待第一条建言。</div>}
@@ -263,11 +269,10 @@ export function ProposalStone() {
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-serif text-lg font-semibold leading-7 text-violet-50">{detail.title}</h3><div className="mt-1"><NarratorIdentity narrator={detail.author} className="text-[11px]" /></div></div><LikeButton post={detail} onLike={toggleLike} busy={likingId === detail.id} /></div>
         {narrator?.isAdmin && <div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void setPinnedState(!detail.isPinned)} className="min-h-8 rounded-full border border-amber-200/20 px-3 text-[10px] text-amber-100 disabled:opacity-30">{detail.isPinned ? "取消置顶" : "置顶建言"}</button><button type="button" disabled={busy} onClick={() => void removePost()} className="min-h-8 rounded-full border border-red-300/20 px-3 text-[10px] text-red-200 disabled:opacity-30">删除建言</button></div>}
       </div>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
+      <div ref={replyScroller} className="min-h-0 flex-1 touch-pan-y space-y-3 overflow-y-auto overscroll-contain p-4" aria-live="polite">
         {detail.content && <article className="max-w-[92%]"><div className="mb-1 px-1 text-[9px] text-slate-500"><NarratorIdentity narrator={detail.author} className="text-[10px]" /></div><p className="whitespace-pre-wrap rounded-2xl rounded-tl-md border border-violet-100/10 bg-violet-100/[.045] px-3 py-2.5 text-sm leading-6 text-slate-200">{detail.content}</p></article>}
         {replies.map((item) => <article key={item.id} className="max-w-[92%]"><div className="mb-1 flex items-end justify-between gap-3 px-1 text-[9px] text-slate-600"><NarratorIdentity narrator={item.author} className="text-[10px]" /><time>{new Date(item.createdAt).toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></div><p className="whitespace-pre-wrap rounded-2xl rounded-tl-md border border-white/10 bg-white/[.035] px-3 py-2.5 text-sm leading-6 text-slate-300">{item.body}</p></article>)}
         {!detail.content && !replies.length && <p className="py-10 text-center text-xs text-slate-600">这条建言尚无正文与回复。</p>}
-        <div ref={messageEnd} />
       </div>
       {error && <p className="mx-3 mb-2 shrink-0 rounded-xl border border-red-400/15 bg-red-400/5 p-2.5 text-xs leading-5 text-red-200">{error}</p>}
       {narrator ? <form onSubmit={sendReply} className="shrink-0 border-t border-violet-100/10 bg-black/20 p-3"><textarea maxLength={1000} value={reply} onChange={(event) => setReply(event.target.value)} rows={2} placeholder="回复这条建言……" className="max-h-28 min-h-16 w-full resize-none rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-slate-600 focus:border-violet-200/30" /><button disabled={busy || !reply.trim()} className="mt-2 min-h-10 w-full rounded-xl bg-violet-100 px-4 text-xs font-semibold text-[#15101d] disabled:opacity-30">发送回复</button></form>
