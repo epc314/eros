@@ -3,11 +3,16 @@ import {
   constantTimeHexEqual,
   createNarratorId,
   derivePassphraseHash,
+  NARRATOR_PBKDF2_ITERATIONS,
   narratorNameKey,
   normalizeNarratorName,
 } from "../../src/lib/narrator/identity";
 
 describe("narrator identity", () => {
+  it("stays within the hosted Workers PBKDF2 limit", () => {
+    expect(NARRATOR_PBKDF2_ITERATIONS).toBe(100_000);
+  });
+
   it("normalizes names consistently for uniqueness checks", () => {
     expect(normalizeNarratorName("  记述  者  ")).toBe("记述 者");
     expect(narratorNameKey("Faust")).toBe(narratorNameKey("faust"));

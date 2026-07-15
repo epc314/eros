@@ -6,7 +6,8 @@ export const NARRATOR_NAME_MAX_LENGTH = 32;
 export const NARRATOR_PASSPHRASE_MIN_LENGTH = 8;
 export const NARRATOR_PASSPHRASE_MAX_LENGTH = 128;
 export const NARRATOR_MESSAGE_MAX_LENGTH = 500;
-export const NARRATOR_PBKDF2_ITERATIONS = 210_000;
+// Cloudflare Workers currently rejects PBKDF2 requests above 100,000 iterations.
+export const NARRATOR_PBKDF2_ITERATIONS = 100_000;
 
 const encoder = new TextEncoder();
 
