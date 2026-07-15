@@ -11,7 +11,7 @@ import { NodeDetailPanel } from "../node/NodeDetailPanel";
 import { ReproductionPanel } from "../reproduction/ReproductionPanel";
 import { TreasureAtlas } from "../treasure/TreasureAtlas";
 import { RadialGraphBackdrop } from "./RadialGraphBackdrop";
-import { EROS_PAGE_READY_EVENT, EROS_PAGE_READY_KEY } from "../floating/page-ready";
+import { EROS_PAGE_READY_EVENT, EROS_PAGE_READY_KEY, EROS_ROOT_SURFACE_EVENT, EROS_ROOT_SURFACE_KEY } from "../floating/page-ready";
 
 const nodeTypes = { eros: GraphNodeCard } satisfies NodeTypes;
 
@@ -168,6 +168,11 @@ function GraphCanvas({ onOpenTreasureAtlas }: { onOpenTreasureAtlas: () => void 
 
 export function ErosGraph() {
   const [view, setView] = useState<"graph" | "treasures">("graph");
+  useEffect(() => {
+    document.documentElement.dataset[EROS_ROOT_SURFACE_KEY] = view;
+    window.dispatchEvent(new CustomEvent(EROS_ROOT_SURFACE_EVENT, { detail: { surface: view } }));
+    return () => { delete document.documentElement.dataset[EROS_ROOT_SURFACE_KEY]; };
+  }, [view]);
   if (view === "treasures") return <TreasureAtlas onBack={() => setView("graph")} />;
   return <ReactFlowProvider><GraphCanvas onOpenTreasureAtlas={() => setView("treasures")} /></ReactFlowProvider>;
 }

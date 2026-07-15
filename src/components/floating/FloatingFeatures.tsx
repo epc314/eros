@@ -5,11 +5,19 @@ import { usePathname } from "next/navigation";
 import { FaustChat } from "@/components/faust/FaustChat";
 import { MephistoTreasure } from "@/components/mephisto/MephistoTreasure";
 import { ProposalStone } from "@/components/proposal/ProposalStone";
-import { EROS_PAGE_READY_EVENT, EROS_PAGE_READY_KEY } from "./page-ready";
+import { EROS_PAGE_READY_EVENT, EROS_PAGE_READY_KEY, EROS_ROOT_SURFACE_EVENT, EROS_ROOT_SURFACE_KEY } from "./page-ready";
 
 export function FloatingFeatures() {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [rootSurface, setRootSurface] = useState<"graph" | "treasures">("graph");
+
+  useEffect(() => {
+    const syncSurface = () => setRootSurface(document.documentElement.dataset[EROS_ROOT_SURFACE_KEY] === "treasures" ? "treasures" : "graph");
+    syncSurface();
+    window.addEventListener(EROS_ROOT_SURFACE_EVENT, syncSurface);
+    return () => window.removeEventListener(EROS_ROOT_SURFACE_EVENT, syncSurface);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,5 +49,5 @@ export function FloatingFeatures() {
   }, [pathname]);
 
   if (!ready) return null;
-  return <><FaustChat /><MephistoTreasure /><ProposalStone dockToGraphPanel={pathname === "/"} /></>;
+  return <><FaustChat /><MephistoTreasure /><ProposalStone dockToGraphPanel={pathname === "/" && rootSurface === "graph"} /></>;
 }
