@@ -41,5 +41,5 @@ export function FloatingFeatures() {
   }, [pathname]);
 
   if (!ready) return null;
-  return <><FaustChat /><MephistoTreasure /><ProposalStone /></>;
+  return <><FaustChat /><MephistoTreasure /><ProposalStone dockToGraphPanel={pathname === "/"} /></>;
 }

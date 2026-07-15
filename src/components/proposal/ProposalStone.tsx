@@ -40,7 +40,7 @@ function ProposalRow({ post, onOpen, onLike, liking }: { post: ProposalSummary; 
   </article>;
 }
 
-export function ProposalStone() {
+export function ProposalStone({ dockToGraphPanel = false }: { dockToGraphPanel?: boolean }) {
   const { narrator, openAuthentication } = useNarrator();
   const [open, setOpen] = useState(false);
   const [hiddenByOtherWindow, setHiddenByOtherWindow] = useState(false);
@@ -219,12 +219,12 @@ export function ProposalStone() {
 
   if (!open && hiddenByOtherWindow) return null;
   if (!open) return <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent("eros-floating-window-open", { detail: { window: "proposal-stone" } })); setOpen(true); }} aria-label="展开建言石"
-    className="fixed right-0 top-1/2 z-[68] flex -translate-y-1/2 flex-col items-center rounded-l-xl border border-r-0 border-violet-200/20 bg-[#171421]/95 px-1.5 py-2 font-serif text-xs leading-4 text-violet-100 shadow-xl backdrop-blur-xl md:right-[414px]">
+    className={`fixed right-0 top-1/2 z-[68] flex -translate-y-1/2 flex-col items-center rounded-l-xl border border-r-0 border-violet-200/20 bg-[#171421]/95 px-1.5 py-2 font-serif text-xs leading-4 text-violet-100 shadow-xl backdrop-blur-xl ${dockToGraphPanel ? "md:right-[414px]" : "md:right-0"}`}>
     <span>建</span><span>言</span><span>石</span>
   </button>;
 
   const activePinned = pinned[pinnedIndex];
-  return <aside aria-label="建言石" onWheel={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} className="nodrag nopan nowheel fixed bottom-2 left-2 right-2 top-16 z-[68] min-h-0 overscroll-contain md:bottom-auto md:left-auto md:right-[414px] md:top-[24%] md:h-[min(620px,66vh)] md:w-[370px]">
+  return <aside aria-label="建言石" onWheel={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()} className={`nodrag nopan nowheel fixed bottom-2 left-2 right-2 top-16 z-[68] min-h-0 overscroll-contain md:bottom-auto md:left-auto md:top-[24%] md:h-[min(620px,66vh)] md:w-[370px] ${dockToGraphPanel ? "md:right-[414px]" : "md:right-2"}`}>
     <button type="button" onClick={closeStone} aria-label="收起建言石" className="absolute left-0 top-1/2 z-20 grid h-14 w-6 -translate-y-1/2 place-items-center rounded-r-full border border-l-0 border-violet-100/15 bg-[#171421]/95 text-base text-violet-100/60 shadow-lg backdrop-blur-xl transition hover:text-violet-50 md:-translate-x-1/2 md:rounded-full md:border-l">›</button>
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-violet-100/15 bg-[#100e18]/[.97] shadow-2xl shadow-black/70 backdrop-blur-2xl">
     {view !== "list" && <button type="button" onClick={() => { setView("list"); setError(""); void loadList(sort); }} className="absolute left-3 top-3 z-20 min-h-8 rounded-full border border-white/10 bg-[#171421]/95 px-3 text-[11px] text-slate-400 shadow-lg backdrop-blur-xl hover:text-white">返回</button>}
