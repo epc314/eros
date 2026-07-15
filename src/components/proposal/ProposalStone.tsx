@@ -213,19 +213,15 @@ export function ProposalStone() {
 
   if (!open && hiddenByOtherWindow) return null;
   if (!open) return <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent("eros-floating-window-open", { detail: { window: "proposal-stone" } })); setOpen(true); }} aria-label="展开建言石"
-    className="fixed right-0 top-[39%] z-[68] flex flex-col items-center gap-1 rounded-l-2xl border border-r-0 border-violet-200/20 bg-[#171421]/95 px-2.5 py-3 font-serif text-sm tracking-[.12em] text-violet-100 shadow-2xl backdrop-blur-xl md:right-[414px]">
-    <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-full border border-violet-200/25 bg-violet-200/10 text-xs">言</span>
+    className="fixed right-0 top-[42%] z-[68] flex flex-col items-center rounded-l-xl border border-r-0 border-violet-200/20 bg-[#171421]/95 px-1.5 py-2 font-serif text-xs leading-4 text-violet-100 shadow-xl backdrop-blur-xl md:right-[414px]">
     <span>建</span><span>言</span><span>石</span>
   </button>;
 
   const activePinned = pinned[pinnedIndex];
-  return <aside aria-label="建言石" className="fixed bottom-2 left-2 right-2 top-16 z-[68] flex min-h-0 flex-col overflow-hidden rounded-3xl border border-violet-100/15 bg-[#100e18]/[.97] shadow-2xl shadow-black/70 backdrop-blur-2xl md:bottom-auto md:left-auto md:right-[414px] md:top-[24%] md:h-[min(620px,66vh)] md:w-[370px]">
-    <header className="flex shrink-0 items-center gap-3 border-b border-violet-100/10 bg-violet-100/[.025] px-4 py-3">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-violet-200/20 bg-violet-200/10 font-serif text-lg text-violet-100">言</span>
-      <div className="min-w-0 flex-1"><p className="text-[9px] uppercase tracking-[.24em] text-violet-300/55">The Proposal Stone</p><h2 className="font-serif text-xl text-violet-50">建言石</h2></div>
-      {view !== "list" && <button type="button" onClick={() => { setView("list"); setError(""); void loadList(sort); }} className="min-h-9 rounded-full border border-white/10 px-3 text-xs text-slate-400 hover:text-white">返回</button>}
-      <button type="button" onClick={closeStone} aria-label="收起建言石" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-xl text-slate-400 hover:text-white">›</button>
-    </header>
+  return <aside aria-label="建言石" className="fixed bottom-2 left-2 right-2 top-16 z-[68] min-h-0 md:bottom-auto md:left-auto md:right-[414px] md:top-[24%] md:h-[min(620px,66vh)] md:w-[370px]">
+    <button type="button" onClick={closeStone} aria-label="收起建言石" className="absolute left-0 top-1/2 z-20 grid h-14 w-6 -translate-y-1/2 place-items-center rounded-r-full border border-l-0 border-violet-100/15 bg-[#171421]/95 text-base text-violet-100/60 shadow-lg backdrop-blur-xl transition hover:text-violet-50 md:-translate-x-1/2 md:rounded-full md:border-l">›</button>
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-violet-100/15 bg-[#100e18]/[.97] shadow-2xl shadow-black/70 backdrop-blur-2xl">
+    {view !== "list" && <button type="button" onClick={() => { setView("list"); setError(""); void loadList(sort); }} className="absolute left-3 top-3 z-20 min-h-8 rounded-full border border-white/10 bg-[#171421]/95 px-3 text-[11px] text-slate-400 shadow-lg backdrop-blur-xl hover:text-white">返回</button>}
 
     {view === "list" && <>
       <div className="shrink-0 border-b border-violet-100/10 px-3 py-3">
@@ -249,7 +245,7 @@ export function ProposalStone() {
       </div>
     </>}
 
-    {view === "create" && <form onSubmit={createPost} className="min-h-0 flex-1 overflow-y-auto p-4">
+    {view === "create" && <form onSubmit={createPost} className="min-h-0 flex-1 overflow-y-auto p-4 pt-14">
       <p className="text-xs leading-6 text-slate-400">建言会永久留下发布者的记述者身份。标题是石面上的铭文，正文可留空。</p>
       <label className="mt-4 block text-xs text-slate-400">标题 · 必填
         <input autoFocus required maxLength={30} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="不超过 30 个字符" className="mt-1 min-h-12 w-full rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-violet-200/30" />
@@ -261,7 +257,7 @@ export function ProposalStone() {
     </form>}
 
     {view === "detail" && detail && <>
-      <div className="shrink-0 border-b border-violet-100/10 px-4 py-3">
+      <div className="shrink-0 border-b border-violet-100/10 px-4 pb-3 pt-14">
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-serif text-lg font-semibold leading-7 text-violet-50">{detail.title}</h3><div className="mt-1"><NarratorIdentity narrator={detail.author} className="text-[11px]" /></div></div><LikeButton post={detail} onLike={toggleLike} busy={likingId === detail.id} /></div>
         {narrator?.isAdmin && <div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void setPinnedState(!detail.isPinned)} className="min-h-8 rounded-full border border-amber-200/20 px-3 text-[10px] text-amber-100 disabled:opacity-30">{detail.isPinned ? "取消置顶" : "置顶建言"}</button><button type="button" disabled={busy} onClick={() => void removePost()} className="min-h-8 rounded-full border border-red-300/20 px-3 text-[10px] text-red-200 disabled:opacity-30">删除建言</button></div>}
       </div>
@@ -276,5 +272,6 @@ export function ProposalStone() {
         : <div className="shrink-0 border-t border-violet-100/10 p-3"><button type="button" onClick={openAuthentication} className="min-h-11 w-full rounded-xl border border-violet-200/20 bg-violet-100/5 px-3 text-xs text-violet-100">登录后才可回复建言</button></div>}
     </>}
     {view === "list" && error && <p className="shrink-0 border-t border-red-400/10 bg-red-400/5 px-3 py-2 text-xs text-red-200">{error}</p>}
+    </div>
   </aside>;
 }
