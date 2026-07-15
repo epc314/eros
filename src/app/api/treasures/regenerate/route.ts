@@ -6,10 +6,9 @@ import { prepareHostedTreasureRegeneration } from "@/lib/hosted/treasure-reposit
 
 export async function POST(request: Request) {
   try {
-    const environment = getHostedEnv();
-    const expected = [environment.EROS_TREASURE_ADMIN_TOKEN, environment.EROS_TREASURE_MIGRATION_TOKEN].filter((token): token is string => Boolean(token));
+    const expected = getHostedEnv().EROS_TREASURE_ADMIN_TOKEN;
     const supplied = request.headers.get("x-eros-treasure-admin-token") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    if (!supplied || !expected.includes(supplied)) throw new ApiFailure("INVALID_TREASURE_ADMIN_TOKEN", "A valid treasure administration token is required.", 401);
+    if (!expected || supplied !== expected) throw new ApiFailure("INVALID_TREASURE_ADMIN_TOKEN", "A valid treasure administration token is required.", 401);
     const prepared = await prepareHostedTreasureRegeneration();
     const generated: Array<{ id: string; name: string; imageId: string | null }> = [];
     const failures: Array<{ id: string; name: string; message: string }> = [];
