@@ -28,7 +28,7 @@ export interface HostedDescription {
   id: string; nodeId: string; body: string; authorLabel: string | null; status: string;
   kind: DescriptionKind; createdAt: string; trueCount: number; falseCount: number;
   narratorId: string | null; narratorName: string | null; narratorTitlesJson: string | null;
-  narratorMessage: string | null; narratorCreatedAt: string | null;
+  narratorMessage: string | null; narratorCreatedAt: string | null; narratorIsAdmin: number | boolean | null;
 }
 export interface HostedReproduction {
   id: string; childNodeId: string; parentLowId: string; parentHighId: string;
@@ -61,6 +61,7 @@ export function ensureHostedSchema(): Promise<void> {
       { table: "treasures", column: "instance_number", sql: "ALTER TABLE treasures ADD COLUMN instance_number INTEGER NOT NULL DEFAULT 1" },
       { table: "treasures", column: "title", sql: "ALTER TABLE treasures ADD COLUMN title TEXT" },
       { table: "treasures", column: "recorder_narrator_id", sql: "ALTER TABLE treasures ADD COLUMN recorder_narrator_id TEXT REFERENCES narrators(id)" },
+      { table: "narrators", column: "is_admin", sql: "ALTER TABLE narrators ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0" },
     ];
     for (const addition of additions) {
       const columns = await hostedDb.prepare(`PRAGMA table_info(${addition.table})`).all<{ name: string }>();
@@ -69,6 +70,7 @@ export function ensureHostedSchema(): Promise<void> {
     await hostedDb.batch([
       hostedDb.prepare("CREATE INDEX IF NOT EXISTS node_descriptions_narrator_idx ON node_descriptions(narrator_id)"),
       hostedDb.prepare("CREATE INDEX IF NOT EXISTS treasure_descriptions_narrator_idx ON treasure_descriptions(narrator_id)"),
+      hostedDb.prepare("UPDATE narrators SET is_admin=1 WHERE name_key='eros'"),
     ]);
   })();
   return schemaPromise!;
@@ -106,7 +108,7 @@ const imageDisplayColumns = `id, node_id AS nodeId, provider, provider_model AS 
   status, error_message AS errorMessage, created_at AS createdAt`;
 const descriptionNarratorColumns = `d.narrator_id AS narratorId,narrator.name AS narratorName,
   narrator.titles_json AS narratorTitlesJson,narrator.message AS narratorMessage,
-  narrator.created_at AS narratorCreatedAt`;
+  narrator.created_at AS narratorCreatedAt,narrator.is_admin AS narratorIsAdmin`;
 
 function normalizeImage(row: HostedImage): HostedImage {
   return { ...row, isPrimary: Boolean(row.isPrimary), imageUrl: row.r2Key ? `/api/images/${row.id}` : row.imageUrl,
@@ -412,6 +414,7 @@ const BACKUP_TABLES = [
   "narrators",
   "worlds", "nodes", "reproductions", "parent_edges", "node_descriptions", "description_feedback", "generated_images",
   "treasures", "treasure_descriptions", "treasure_description_feedback", "treasure_images",
+  "proposal_posts", "proposal_replies", "proposal_likes",
 ] as const;
 
 export async function exportHostedDatabase() {

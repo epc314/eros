@@ -32,6 +32,7 @@ export interface HostedTreasure {
   recorderNarratorTitlesJson: string | null;
   recorderNarratorMessage: string | null;
   recorderNarratorCreatedAt: string | null;
+  recorderNarratorIsAdmin: number | boolean | null;
   status: TreasureStatus;
   createdAt: string;
   collectedAt: string | null;
@@ -52,6 +53,7 @@ export interface HostedTreasureDescription {
   narratorTitlesJson: string | null;
   narratorMessage: string | null;
   narratorCreatedAt: string | null;
+  narratorIsAdmin: number | boolean | null;
 }
 
 export interface HostedTreasureImage {
@@ -91,6 +93,7 @@ const treasureColumns = `t.id,t.world_id AS worldId,t.owner_node_id AS ownerNode
   (SELECT titles_json FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorTitlesJson,
   (SELECT message FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorMessage,
   (SELECT created_at FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorCreatedAt,
+  (SELECT is_admin FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorIsAdmin,
   t.status,t.created_at AS createdAt,t.collected_at AS collectedAt`;
 const imageColumns = `id,treasure_id AS treasureId,provider,provider_model AS providerModel,
   provider_request_id AS providerRequestId,exact_prompt AS exactPrompt,prompt_version AS promptVersion,
@@ -102,7 +105,7 @@ const imageDisplayColumns = `id,treasure_id AS treasureId,provider,provider_mode
   width,height,is_primary AS isPrimary,status,error_message AS errorMessage,created_at AS createdAt`;
 const descriptionNarratorColumns = `d.narrator_id AS narratorId,narrator.name AS narratorName,
   narrator.titles_json AS narratorTitlesJson,narrator.message AS narratorMessage,
-  narrator.created_at AS narratorCreatedAt`;
+  narrator.created_at AS narratorCreatedAt,narrator.is_admin AS narratorIsAdmin`;
 
 function recorderNarrator(row: HostedTreasure): PublicNarrator | null {
   return narratorFromColumns({
@@ -111,11 +114,12 @@ function recorderNarrator(row: HostedTreasure): PublicNarrator | null {
     narratorTitlesJson: row.recorderNarratorTitlesJson,
     narratorMessage: row.recorderNarratorMessage,
     narratorCreatedAt: row.recorderNarratorCreatedAt,
+    narratorIsAdmin: row.recorderNarratorIsAdmin,
   });
 }
 
 type SerializedHostedTreasure = Omit<HostedTreasure,
-  "recorderNarratorId" | "recorderNarratorName" | "recorderNarratorTitlesJson" | "recorderNarratorMessage" | "recorderNarratorCreatedAt"
+  "recorderNarratorId" | "recorderNarratorName" | "recorderNarratorTitlesJson" | "recorderNarratorMessage" | "recorderNarratorCreatedAt" | "recorderNarratorIsAdmin"
 > & { recorderNarrator: PublicNarrator | null };
 
 export function serializeHostedTreasure(row: HostedTreasure): SerializedHostedTreasure {
@@ -125,6 +129,7 @@ export function serializeHostedTreasure(row: HostedTreasure): SerializedHostedTr
   Reflect.deleteProperty(treasure, "recorderNarratorTitlesJson");
   Reflect.deleteProperty(treasure, "recorderNarratorMessage");
   Reflect.deleteProperty(treasure, "recorderNarratorCreatedAt");
+  Reflect.deleteProperty(treasure, "recorderNarratorIsAdmin");
   return { ...(treasure as unknown as Omit<SerializedHostedTreasure, "recorderNarrator">), recorderNarrator: recorderNarrator(row) };
 }
 

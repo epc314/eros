@@ -4,6 +4,7 @@ export interface PublicNarrator {
   titles: string[];
   message: string;
   createdAt: string;
+  isAdmin: boolean;
 }
 
 export type AuthorshipMode = "narrator" | "custom";
@@ -20,6 +21,7 @@ export interface NarratorColumns {
   narratorTitlesJson: string | null;
   narratorMessage: string | null;
   narratorCreatedAt: string | null;
+  narratorIsAdmin: number | boolean | null;
 }
 
 export function narratorFromColumns(row: NarratorColumns): PublicNarrator | null {
@@ -37,6 +39,7 @@ export function narratorFromColumns(row: NarratorColumns): PublicNarrator | null
     titles,
     message: row.narratorMessage ?? "",
     createdAt: row.narratorCreatedAt,
+    isAdmin: Boolean(row.narratorIsAdmin),
   };
 }
 
@@ -47,5 +50,6 @@ export function withoutNarratorColumns<T extends NarratorColumns>(row: T): Omit<
   delete result.narratorTitlesJson;
   delete result.narratorMessage;
   delete result.narratorCreatedAt;
+  delete result.narratorIsAdmin;
   return result as Omit<T, keyof NarratorColumns>;
 }

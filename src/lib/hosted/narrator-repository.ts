@@ -34,7 +34,7 @@ interface SessionGrant {
 }
 
 const narratorColumns = `n.id AS narratorId,n.name AS narratorName,n.name_key AS nameKey,
-  n.titles_json AS narratorTitlesJson,n.message AS narratorMessage,n.created_at AS narratorCreatedAt,
+  n.titles_json AS narratorTitlesJson,n.message AS narratorMessage,n.created_at AS narratorCreatedAt,n.is_admin AS narratorIsAdmin,
   n.passphrase_salt AS passphraseSalt,n.passphrase_hash AS passphraseHash,
   n.passphrase_iterations AS passphraseIterations`;
 
@@ -124,7 +124,7 @@ export async function registerNarrator(nameInput: string, passphraseInput: strin
       throw new ApiFailure("NARRATOR_NAME_TAKEN", "这个记述者名已经被使用。", 409);
     throw error;
   }
-  const narrator: PublicNarrator = { id, name, titles: [], message: "", createdAt };
+  const narrator: PublicNarrator = { id, name, titles: [], message: "", createdAt, isAdmin: false };
   return { narrator, session: await createSession(id) };
 }
 

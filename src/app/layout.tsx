@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FaustChat } from "@/components/faust/FaustChat";
 import { MephistoTreasure } from "@/components/mephisto/MephistoTreasure";
 import { NarratorAccountButton, NarratorProvider } from "@/components/narrator/NarratorProvider";
+import { ProposalStone } from "@/components/proposal/ProposalStone";
 import { PROTOCOL_VERSION } from "@/lib/protocol/constants";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     {children}
     <FaustChat />
     <MephistoTreasure />
+    <ProposalStone />
     </NarratorProvider>
   </body></html>;
 }
