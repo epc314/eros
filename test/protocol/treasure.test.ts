@@ -77,6 +77,9 @@ describe("Eros treasure protocol", () => {
     expect(last.subjectNameEn).toBe("Ritual Horn");
     expect(first.tokens).toHaveLength(15);
     expect(new Set(first.tokens.map(({ family }) => family)).size).toBe(15);
+    expect(first.tokens.filter(({ position }) => [1, 2, 3, 4, 6].includes(position)).map(({ family }) => family)).toEqual([
+      "presence", "palette_relation", "illumination", "rendering", "visual_balance",
+    ]);
     expect(first.tokens[7]).toMatchObject({ position: 8, family: "ornament_layout", familyZh: "纹饰布局" });
     expect(first.tokens[12]).toMatchObject({ position: 13, family: "detail_finish", familyZh: "细部处理" });
     const neutralVariants = Array.from({ length: 16 }, (_, value) => {
@@ -91,6 +94,7 @@ describe("Eros treasure protocol", () => {
     expect(addTreasureInstanceNumber("Gaia 的 宝珠", 2)).toBe("Gaia 的 宝珠（2）");
     const prompt = buildTreasureImagePrompt(first.subjectNameEn, first.tokens);
     expect(prompt).toContain("Treasure subject:\n- Jeweled Orb");
+    expect(prompt).toContain("If an attribute conflicts with the subject, prioritize the subject's normal characteristics");
     expect(prompt).toContain("A mysterious treasure with a mythic aura, presented in a painterly style with a sense of history.");
     expect(prompt).not.toMatch(/\p{Script=Han}/u);
   });
