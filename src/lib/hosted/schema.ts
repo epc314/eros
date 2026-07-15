@@ -34,10 +34,23 @@ export const SCHEMA_STATEMENTS = [
     FOREIGN KEY(parent_node_id) REFERENCES nodes(id), FOREIGN KEY(child_node_id) REFERENCES nodes(id)
   )`,
   `CREATE INDEX IF NOT EXISTS parent_edges_child_idx ON parent_edges(child_node_id)`,
+  `CREATE TABLE IF NOT EXISTS narrators (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE,
+    passphrase_salt TEXT NOT NULL, passphrase_hash TEXT NOT NULL,
+    passphrase_iterations INTEGER NOT NULL, titles_json TEXT NOT NULL DEFAULT '[]',
+    message TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS narrator_sessions (
+    id TEXT PRIMARY KEY, narrator_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+    FOREIGN KEY(narrator_id) REFERENCES narrators(id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS narrator_sessions_narrator_idx ON narrator_sessions(narrator_id)`,
+  `CREATE INDEX IF NOT EXISTS narrator_sessions_expiry_idx ON narrator_sessions(expires_at)`,
   `CREATE TABLE IF NOT EXISTS node_descriptions (
-    id TEXT PRIMARY KEY, node_id TEXT NOT NULL, body TEXT NOT NULL, author_label TEXT,
+    id TEXT PRIMARY KEY, node_id TEXT NOT NULL, body TEXT NOT NULL, author_label TEXT, narrator_id TEXT,
     status TEXT NOT NULL DEFAULT 'VISIBLE', kind TEXT NOT NULL DEFAULT 'STORY', created_at TEXT NOT NULL,
-    FOREIGN KEY(node_id) REFERENCES nodes(id)
+    FOREIGN KEY(node_id) REFERENCES nodes(id), FOREIGN KEY(narrator_id) REFERENCES narrators(id)
   )`,
   `CREATE INDEX IF NOT EXISTS node_descriptions_node_created_idx ON node_descriptions(node_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS description_feedback (
@@ -62,17 +75,20 @@ export const SCHEMA_STATEMENTS = [
     search_timestamp_ms TEXT NOT NULL,
     search_attempt INTEGER NOT NULL, search_hash_hex TEXT NOT NULL, match_score INTEGER NOT NULL,
     owner_feature_hex TEXT NOT NULL, tokens_json TEXT NOT NULL, exact_prompt TEXT NOT NULL,
-    recorder_name TEXT, status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COLLECTED')),
+    recorder_name TEXT, recorder_narrator_id TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COLLECTED')),
     created_at TEXT NOT NULL, collected_at TEXT,
     UNIQUE(owner_node_id, subject_index, instance_number), UNIQUE(owner_node_id, search_hash_hex),
-    FOREIGN KEY(world_id) REFERENCES worlds(id), FOREIGN KEY(owner_node_id) REFERENCES nodes(id)
+    FOREIGN KEY(world_id) REFERENCES worlds(id), FOREIGN KEY(owner_node_id) REFERENCES nodes(id),
+    FOREIGN KEY(recorder_narrator_id) REFERENCES narrators(id)
   )`,
   `CREATE INDEX IF NOT EXISTS treasures_world_status_created_idx ON treasures(world_id, status, created_at)`,
   `CREATE INDEX IF NOT EXISTS treasures_owner_status_idx ON treasures(owner_node_id, status)`,
   `CREATE TABLE IF NOT EXISTS treasure_descriptions (
-    id TEXT PRIMARY KEY, treasure_id TEXT NOT NULL, body TEXT NOT NULL, author_label TEXT,
+    id TEXT PRIMARY KEY, treasure_id TEXT NOT NULL, body TEXT NOT NULL, author_label TEXT, narrator_id TEXT,
     status TEXT NOT NULL DEFAULT 'VISIBLE', kind TEXT NOT NULL DEFAULT 'STORY' CHECK(kind IN ('DISCOVERY','STORY')),
-    created_at TEXT NOT NULL, FOREIGN KEY(treasure_id) REFERENCES treasures(id)
+    created_at TEXT NOT NULL, FOREIGN KEY(treasure_id) REFERENCES treasures(id),
+    FOREIGN KEY(narrator_id) REFERENCES narrators(id)
   )`,
   `CREATE INDEX IF NOT EXISTS treasure_descriptions_treasure_created_idx ON treasure_descriptions(treasure_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS treasure_description_feedback (

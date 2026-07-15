@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ApiFailure, apiError } from "@/lib/api";
 import { generateTreasureImage } from "@/lib/hosted/treasure-image-service";
-import { createOrGetTreasureCandidate, getCollectedTreasure } from "@/lib/hosted/treasure-repository";
+import { createOrGetTreasureCandidate, getCollectedTreasure, serializeHostedTreasure } from "@/lib/hosted/treasure-repository";
 import { hostedWorldGraph } from "@/lib/hosted/repository";
 import { enforceRateLimit, requestAddress } from "@/lib/security/rate-limit";
 import { plainText, unicodeLength } from "@/lib/security/text";
@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ alreadyCollected: true, ...(await getCollectedTreasure(candidate.treasure.id)) });
     }
     const image = await generateTreasureImage(candidate.treasure.id);
-    const { tokensJson, ...publicTreasure } = candidate.treasure;
+    const serialized = serializeHostedTreasure(candidate.treasure);
+    const { tokensJson, ...publicTreasure } = serialized;
     return NextResponse.json({
       alreadyCollected: false,
       treasure: { ...publicTreasure, tokens: JSON.parse(tokensJson) },

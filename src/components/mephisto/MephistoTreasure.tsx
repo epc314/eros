@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { AuthorshipControl, useAuthorship } from "@/components/narrator/AuthorshipControl";
 import { MEPHISTO_GREETING, type TreasureToken } from "@/lib/treasure/protocol";
 
 interface Match { id: string; name: string; score: number; featureHex: string }
@@ -23,7 +24,7 @@ export function MephistoTreasure() {
   const [search, setSearch] = useState<SearchResult | null>(null);
   const [candidate, setCandidate] = useState<TreasureCandidate | null>(null);
   const [images, setImages] = useState<TreasureImage[]>([]);
-  const [recorderName, setRecorderName] = useState("");
+  const authorship = useAuthorship();
   const [phase, setPhase] = useState<"idle" | "searching" | "choosing" | "generating" | "candidate" | "collected">("idle");
   const [error, setError] = useState("");
   const scrollEnd = useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export function MephistoTreasure() {
   }, []);
 
   function reset() {
-    setSpell(""); setActiveSpell(""); setSearch(null); setCandidate(null); setImages([]); setRecorderName(""); setPhase("idle"); setError("");
+    setSpell(""); setActiveSpell(""); setSearch(null); setCandidate(null); setImages([]); authorship.setCustomLabel(""); setPhase("idle"); setError("");
   }
 
   async function generate(owner: Match, currentSearch: SearchResult, currentSpell: string) {
@@ -86,7 +87,10 @@ export function MephistoTreasure() {
     setError("");
     try {
       const response = await fetch(`/api/treasures/${candidate.id}/collect`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ recorderName }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+          authorMode: authorship.narrator && authorship.mode === "narrator" ? "narrator" : "custom",
+          ...(authorship.mode === "custom" && authorship.customLabel ? { recorderName: authorship.customLabel } : {}),
+        }),
       });
       const body = await response.json() as { treasure?: TreasureCandidate; images?: TreasureImage[]; error?: { message?: string } };
       if (!response.ok || !body.treasure) { setError(body.error?.message ?? "宝物收录失败。"); return; }
@@ -135,7 +139,7 @@ export function MephistoTreasure() {
         <div className="p-4"><p className="text-xs text-emerald-300">{candidate.subjectGroup}</p><h3 className="mt-1 font-serif text-xl text-emerald-50">{candidate.name}</h3>
           <p className="mt-2 text-xs text-slate-500">持有存在 · <Link className="text-cyan-300" href={`/nodes/${candidate.ownerNodeId}`}>{candidate.ownerName}</Link> · {candidate.protocolVersion === "eros-treasure-v1" ? `共同为 1：${candidate.matchScore} bit` : `相同：${candidate.matchScore}/128 bit`}</p>
           <details className="mt-3 rounded-xl border border-white/10 p-3"><summary className="cursor-pointer text-xs text-emerald-200">查看 128-bit 与确定性特征</summary><p className="hash mt-2 break-all text-[10px] text-slate-600">{candidate.searchHashHex}</p><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">{candidate.tokens.map((token) => <div key={token.position} className="contents"><dt className="text-slate-500">{token.familyZh}</dt><dd className="text-slate-300">{token.phraseZh}</dd></div>)}</dl></details>
-          {phase === "candidate" ? <div className="mt-4"><input value={recorderName} onChange={(event) => setRecorderName(event.target.value)} maxLength={64} placeholder="记述人的名字（留空为匿名）" aria-label="记述人的名字" className="w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm outline-none focus:border-emerald-200/30"/><button type="button" onClick={() => void collect()} className="mt-2 min-h-11 w-full rounded-xl bg-emerald-100 px-4 text-sm font-semibold text-[#0b120f]">收录</button></div>
+          {phase === "candidate" ? <div className="mt-4"><AuthorshipControl label="收录署名" mode={authorship.mode} setMode={authorship.setMode} customLabel={authorship.customLabel} setCustomLabel={authorship.setCustomLabel} /><button type="button" onClick={() => void collect()} className="mt-2 min-h-11 w-full rounded-xl bg-emerald-100 px-4 text-sm font-semibold text-[#0b120f]">收录</button></div>
             : <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3 text-sm text-emerald-200">已收入宝物图鉴 · <Link className="underline" href={`/treasures/${candidate.id}`}>打开详细记录</Link></div>}
         </div>
       </section>}

@@ -8,6 +8,7 @@ import { reproduce } from "../protocol/reproduction";
 import { calculateMutationStats } from "../protocol/token-decoder";
 import { descendantBirthRecord, EROS_BIRTH_RECORD, EROS_DEATH_RECORD, genesisBirthRecord, type DescriptionKind } from "../story";
 import { buildStoryContext, type StoryContextOptions } from "../story-context";
+import { narratorFromColumns, withoutNarratorColumns, type NarratorColumns, type PublicNarrator } from "../narrator/types";
 import { getHostedEnv } from "./env";
 import { SCHEMA_STATEMENTS } from "./schema";
 
@@ -26,6 +27,8 @@ export interface HostedNode {
 export interface HostedDescription {
   id: string; nodeId: string; body: string; authorLabel: string | null; status: string;
   kind: DescriptionKind; createdAt: string; trueCount: number; falseCount: number;
+  narratorId: string | null; narratorName: string | null; narratorTitlesJson: string | null;
+  narratorMessage: string | null; narratorCreatedAt: string | null;
 }
 export interface HostedReproduction {
   id: string; childNodeId: string; parentLowId: string; parentHighId: string;
@@ -49,7 +52,25 @@ export interface HostedImage {
 let schemaPromise: Promise<void> | undefined;
 export function ensureHostedSchema(): Promise<void> {
   if (process.env.NODE_ENV !== "development") return Promise.resolve();
-  schemaPromise ??= getHostedEnv().DB.batch(SCHEMA_STATEMENTS.map((sql) => getHostedEnv().DB.prepare(sql))).then(() => undefined);
+  schemaPromise ??= (async () => {
+    const hostedDb = getHostedEnv().DB;
+    await hostedDb.batch(SCHEMA_STATEMENTS.map((sql) => hostedDb.prepare(sql)));
+    const additions = [
+      { table: "node_descriptions", column: "narrator_id", sql: "ALTER TABLE node_descriptions ADD COLUMN narrator_id TEXT REFERENCES narrators(id)" },
+      { table: "treasure_descriptions", column: "narrator_id", sql: "ALTER TABLE treasure_descriptions ADD COLUMN narrator_id TEXT REFERENCES narrators(id)" },
+      { table: "treasures", column: "instance_number", sql: "ALTER TABLE treasures ADD COLUMN instance_number INTEGER NOT NULL DEFAULT 1" },
+      { table: "treasures", column: "title", sql: "ALTER TABLE treasures ADD COLUMN title TEXT" },
+      { table: "treasures", column: "recorder_narrator_id", sql: "ALTER TABLE treasures ADD COLUMN recorder_narrator_id TEXT REFERENCES narrators(id)" },
+    ];
+    for (const addition of additions) {
+      const columns = await hostedDb.prepare(`PRAGMA table_info(${addition.table})`).all<{ name: string }>();
+      if (!columns.results.some(({ name }) => name === addition.column)) await hostedDb.prepare(addition.sql).run();
+    }
+    await hostedDb.batch([
+      hostedDb.prepare("CREATE INDEX IF NOT EXISTS node_descriptions_narrator_idx ON node_descriptions(narrator_id)"),
+      hostedDb.prepare("CREATE INDEX IF NOT EXISTS treasure_descriptions_narrator_idx ON treasure_descriptions(narrator_id)"),
+    ]);
+  })();
   return schemaPromise!;
 }
 
@@ -83,6 +104,9 @@ const imageDisplayColumns = `id, node_id AS nodeId, provider, provider_model AS 
   variation_id AS variationId, image_url AS imageUrl, r2_key AS r2Key,
   content_type AS contentType, width, height, is_primary AS isPrimary,
   status, error_message AS errorMessage, created_at AS createdAt`;
+const descriptionNarratorColumns = `d.narrator_id AS narratorId,narrator.name AS narratorName,
+  narrator.titles_json AS narratorTitlesJson,narrator.message AS narratorMessage,
+  narrator.created_at AS narratorCreatedAt`;
 
 function normalizeImage(row: HostedImage): HostedImage {
   return { ...row, isPrimary: Boolean(row.isPrimary), imageUrl: row.r2Key ? `/api/images/${row.id}` : row.imageUrl,
@@ -91,6 +115,11 @@ function normalizeImage(row: HostedImage): HostedImage {
 
 function normalizeNode(row: HostedNode): HostedNode {
   return { ...row, isDead: Boolean(row.isDead), recordsLocked: Boolean(row.recordsLocked) };
+}
+
+function normalizeDescription(row: HostedDescription): Omit<HostedDescription, keyof NarratorColumns> & { narrator: PublicNarrator | null } {
+  const narrator = narratorFromColumns(row);
+  return { ...withoutNarratorColumns(row), narrator };
 }
 
 function configuredTimestamp(): bigint | undefined {
@@ -180,15 +209,17 @@ export async function hostedWorldContext(options: StoryContextOptions) {
       FROM parent_edges pe JOIN nodes child ON child.id=pe.child_node_id
       WHERE child.world_id=? ORDER BY child.generation, pe.created_at, pe.parent_node_id`).bind(WORLD_ID),
     db().prepare(`SELECT d.id,d.node_id AS nodeId,d.body,d.author_label AS authorLabel,d.kind,d.created_at AS createdAt,
+      ${descriptionNarratorColumns},
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
       FROM node_descriptions d JOIN nodes n ON n.id=d.node_id
+      LEFT JOIN narrators narrator ON narrator.id=d.narrator_id
       WHERE n.world_id=? AND d.status='VISIBLE' ORDER BY d.created_at,d.id`).bind(WORLD_ID),
   ]);
   const nodes = (nodesResult.results as unknown as HostedNode[]).map(normalizeNode);
   const edges = edgesResult.results as unknown as Array<{ parentNodeId: string; childNodeId: string }>;
   const descriptions = (descriptionsResult.results as unknown as HostedDescription[]).map((item) => ({
-    ...item, trueCount: Number(item.trueCount), falseCount: Number(item.falseCount),
+    ...normalizeDescription(item), trueCount: Number(item.trueCount), falseCount: Number(item.falseCount),
   }));
   return buildStoryContext({ worldName: world.name, nodes, edges, records: descriptions, options });
 }
@@ -218,9 +249,11 @@ export async function getHostedNode(id: string) {
     db().prepare(`SELECT ${reproductionColumns} FROM reproductions WHERE child_node_id=?`).bind(id),
     db().prepare("SELECT id,child_node_id AS childNodeId FROM parent_edges WHERE parent_node_id=? ORDER BY created_at").bind(id),
     db().prepare(`SELECT d.id,d.node_id AS nodeId,d.body,d.author_label AS authorLabel,d.status,d.kind,d.created_at AS createdAt,
+      ${descriptionNarratorColumns},
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
       (SELECT COUNT(*) FROM description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
-      FROM node_descriptions d WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id),
+      FROM node_descriptions d LEFT JOIN narrators narrator ON narrator.id=d.narrator_id
+      WHERE d.node_id=? AND d.status='VISIBLE' ORDER BY d.created_at ASC`).bind(id),
     db().prepare(`SELECT ${imageColumns} FROM generated_images WHERE node_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id),
   ]);
   const reproduction = (detailResults[0].results[0] as unknown as HostedReproduction | undefined) ?? null;
@@ -232,7 +265,7 @@ export async function getHostedNode(id: string) {
     db().prepare(`SELECT ${nodeColumns} FROM nodes WHERE id IN (${childEdges.map(() => "?").join(",")})`)
       .bind(...childEdges.map(({ childNodeId }) => childNodeId)),
   )).map(normalizeNode) : [];
-  return { node, parents, children, reproduction, descriptions: descriptions.map((item) => ({ ...item, trueCount: Number(item.trueCount), falseCount: Number(item.falseCount) })), images: rawImages.map(normalizeImage) };
+  return { node, parents, children, reproduction, descriptions: descriptions.map((item) => ({ ...normalizeDescription(item), trueCount: Number(item.trueCount), falseCount: Number(item.falseCount) })), images: rawImages.map(normalizeImage) };
 }
 
 export async function getHostedNodeByReference(reference: string) {
@@ -326,7 +359,7 @@ export async function createHostedDescendant(parentAId: string, parentBId: strin
   return { node, ...preview, created: true };
 }
 
-export async function addHostedDescription(nodeId: string, body: string, authorLabel?: string) {
+export async function addHostedDescription(nodeId: string, body: string, attribution: { authorLabel: string | null; narratorId: string | null; narrator: PublicNarrator | null }) {
   await ensureHostedSchema();
   const node = await first<{ id: string; recordsLocked: number }>(db().prepare("SELECT id,records_locked AS recordsLocked FROM nodes WHERE id=?").bind(nodeId));
   if (!node) throw new ApiFailure("NODE_NOT_FOUND", "Node not found.", 404);
@@ -335,9 +368,10 @@ export async function addHostedDescription(nodeId: string, body: string, authorL
   const recent = await all<{ body: string }>(db().prepare("SELECT body FROM node_descriptions WHERE node_id=? AND created_at>=?").bind(nodeId, since));
   if (recent.some((item) => item.body.normalize("NFKC").toLowerCase() === body.toLowerCase()))
     throw new ApiFailure("DUPLICATE_DESCRIPTION", "This description was already added recently.", 409);
-  const description = { id: newRecordId(), nodeId, body, authorLabel: authorLabel || null, status: "VISIBLE", kind: "STORY" as const, createdAt: new Date().toISOString(), trueCount: 0, falseCount: 0 };
-  await db().prepare("INSERT INTO node_descriptions (id,node_id,body,author_label,status,kind,created_at) VALUES (?,?,?,?,?,?,?)")
-    .bind(description.id, nodeId, body, description.authorLabel, description.status, description.kind, description.createdAt).run();
+  const description = { id: newRecordId(), nodeId, body, authorLabel: attribution.authorLabel, narrator: attribution.narrator,
+    status: "VISIBLE", kind: "STORY" as const, createdAt: new Date().toISOString(), trueCount: 0, falseCount: 0 };
+  await db().prepare("INSERT INTO node_descriptions (id,node_id,body,author_label,narrator_id,status,kind,created_at) VALUES (?,?,?,?,?,?,?,?)")
+    .bind(description.id, nodeId, body, description.authorLabel, attribution.narratorId, description.status, description.kind, description.createdAt).run();
   return description;
 }
 
@@ -375,6 +409,7 @@ export async function setHostedDescriptionFeedback(descriptionId: string, voterK
 }
 
 const BACKUP_TABLES = [
+  "narrators",
   "worlds", "nodes", "reproductions", "parent_edges", "node_descriptions", "description_feedback", "generated_images",
   "treasures", "treasure_descriptions", "treasure_description_feedback", "treasure_images",
 ] as const;

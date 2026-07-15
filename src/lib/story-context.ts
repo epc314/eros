@@ -1,6 +1,7 @@
 import { decodeGenome } from "./protocol/token-decoder";
 import type { EntityAnchorToken, Hex512 } from "./protocol/types";
 import type { DescriptionKind } from "./story";
+import type { PublicNarrator } from "./narrator/types";
 
 export type StoryContextLanguage = "zh" | "en" | "both";
 
@@ -33,6 +34,7 @@ export interface StoryContextRecordInput {
   createdAt: string;
   trueCount: number;
   falseCount: number;
+  narrator?: PublicNarrator | null;
 }
 
 export interface StoryContextRecord {
@@ -40,6 +42,7 @@ export interface StoryContextRecord {
   type: "birth" | "story" | "death" | "revival";
   text: string;
   author?: string;
+  narrator?: { id: string; name: string; titles: string[] };
   createdAt: string;
   feedback: { trueVotes: number; falseVotes: number; disputed: boolean };
 }
@@ -81,6 +84,7 @@ function storyRecords(inputs: StoryContextRecordInput[]): StoryContextRecord[] {
       type: item.kind.toLowerCase() as StoryContextRecord["type"],
       text: item.body,
       ...(item.authorLabel ? { author: item.authorLabel } : {}),
+      ...(item.narrator ? { narrator: { id: item.narrator.id, name: item.narrator.name, titles: item.narrator.titles } } : {}),
       createdAt: item.createdAt,
       feedback: {
         trueVotes: item.trueCount,
@@ -170,7 +174,7 @@ export function formatStoryContextText(context: StoryContext): string {
       lines.push(`existence=${JSON.stringify(existence.name)} | status=${existence.status}${existence.locked ? " | locked=true" : ""} | primary=${JSON.stringify(existence.entity.primary)} | auxiliaries=${JSON.stringify(existence.entity.auxiliaries)} | parents=${JSON.stringify(existence.parents)}`);
       if (!existence.records.length) lines.push("  records=[]");
       for (const record of existence.records) {
-        lines.push(`  record id=${JSON.stringify(record.id)} | type=${record.type} | created_at=${record.createdAt}${record.author ? ` | author=${JSON.stringify(record.author)}` : ""} | true_votes=${record.feedback.trueVotes} | false_votes=${record.feedback.falseVotes} | disputed=${record.feedback.disputed} | text=${JSON.stringify(record.text)}`);
+        lines.push(`  record id=${JSON.stringify(record.id)} | type=${record.type} | created_at=${record.createdAt}${record.author ? ` | author=${JSON.stringify(record.author)}` : ""}${record.narrator ? ` | narrator_id=${record.narrator.id} | narrator_titles=${JSON.stringify(record.narrator.titles)}` : ""} | true_votes=${record.feedback.trueVotes} | false_votes=${record.feedback.falseVotes} | disputed=${record.feedback.disputed} | text=${JSON.stringify(record.text)}`);
       }
     }
   }

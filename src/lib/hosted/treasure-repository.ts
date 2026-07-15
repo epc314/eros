@@ -1,4 +1,5 @@
 import { ApiFailure } from "../api";
+import { narratorFromColumns, withoutNarratorColumns, type NarratorAttribution, type PublicNarrator } from "../narrator/types";
 import { TREASURE_PROTOCOL_VERSION, addTreasureInstanceNumber, buildTreasureImagePrompt, decodeTreasure, type TreasureToken } from "../treasure/protocol";
 import { getHostedEnv } from "./env";
 import { ensureHostedSchema, WORLD_ID } from "./repository";
@@ -26,6 +27,11 @@ export interface HostedTreasure {
   tokensJson: string;
   exactPrompt: string;
   recorderName: string | null;
+  recorderNarratorId: string | null;
+  recorderNarratorName: string | null;
+  recorderNarratorTitlesJson: string | null;
+  recorderNarratorMessage: string | null;
+  recorderNarratorCreatedAt: string | null;
   status: TreasureStatus;
   createdAt: string;
   collectedAt: string | null;
@@ -41,6 +47,11 @@ export interface HostedTreasureDescription {
   createdAt: string;
   trueCount: number;
   falseCount: number;
+  narratorId: string | null;
+  narratorName: string | null;
+  narratorTitlesJson: string | null;
+  narratorMessage: string | null;
+  narratorCreatedAt: string | null;
 }
 
 export interface HostedTreasureImage {
@@ -75,6 +86,11 @@ const treasureColumns = `t.id,t.world_id AS worldId,t.owner_node_id AS ownerNode
   t.subject_group AS subjectGroup,t.instance_number AS instanceNumber,t.search_timestamp_ms AS searchTimestampMs,t.search_attempt AS searchAttempt,
   t.search_hash_hex AS searchHashHex,t.match_score AS matchScore,t.owner_feature_hex AS ownerFeatureHex,
   t.tokens_json AS tokensJson,t.exact_prompt AS exactPrompt,t.recorder_name AS recorderName,
+  t.recorder_narrator_id AS recorderNarratorId,
+  (SELECT name FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorName,
+  (SELECT titles_json FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorTitlesJson,
+  (SELECT message FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorMessage,
+  (SELECT created_at FROM narrators WHERE id=t.recorder_narrator_id) AS recorderNarratorCreatedAt,
   t.status,t.created_at AS createdAt,t.collected_at AS collectedAt`;
 const imageColumns = `id,treasure_id AS treasureId,provider,provider_model AS providerModel,
   provider_request_id AS providerRequestId,exact_prompt AS exactPrompt,prompt_version AS promptVersion,
@@ -84,6 +100,38 @@ const imageColumns = `id,treasure_id AS treasureId,provider,provider_model AS pr
 const imageDisplayColumns = `id,treasure_id AS treasureId,provider,provider_model AS providerModel,
   variation_id AS variationId,image_url AS imageUrl,r2_key AS r2Key,content_type AS contentType,
   width,height,is_primary AS isPrimary,status,error_message AS errorMessage,created_at AS createdAt`;
+const descriptionNarratorColumns = `d.narrator_id AS narratorId,narrator.name AS narratorName,
+  narrator.titles_json AS narratorTitlesJson,narrator.message AS narratorMessage,
+  narrator.created_at AS narratorCreatedAt`;
+
+function recorderNarrator(row: HostedTreasure): PublicNarrator | null {
+  return narratorFromColumns({
+    narratorId: row.recorderNarratorId,
+    narratorName: row.recorderNarratorName,
+    narratorTitlesJson: row.recorderNarratorTitlesJson,
+    narratorMessage: row.recorderNarratorMessage,
+    narratorCreatedAt: row.recorderNarratorCreatedAt,
+  });
+}
+
+type SerializedHostedTreasure = Omit<HostedTreasure,
+  "recorderNarratorId" | "recorderNarratorName" | "recorderNarratorTitlesJson" | "recorderNarratorMessage" | "recorderNarratorCreatedAt"
+> & { recorderNarrator: PublicNarrator | null };
+
+export function serializeHostedTreasure(row: HostedTreasure): SerializedHostedTreasure {
+  const treasure = { ...row };
+  Reflect.deleteProperty(treasure, "recorderNarratorId");
+  Reflect.deleteProperty(treasure, "recorderNarratorName");
+  Reflect.deleteProperty(treasure, "recorderNarratorTitlesJson");
+  Reflect.deleteProperty(treasure, "recorderNarratorMessage");
+  Reflect.deleteProperty(treasure, "recorderNarratorCreatedAt");
+  return { ...(treasure as unknown as Omit<SerializedHostedTreasure, "recorderNarrator">), recorderNarrator: recorderNarrator(row) };
+}
+
+function normalizeTreasureDescription(row: HostedTreasureDescription) {
+  const narrator = narratorFromColumns(row);
+  return { ...withoutNarratorColumns(row), narrator };
+}
 
 function normalizeImage(row: HostedTreasureImage): HostedTreasureImage {
   return {
@@ -177,6 +225,7 @@ export async function listCollectedTreasures(query?: string) {
     instanceNumber: treasure.instanceNumber,
     searchHashHex: treasure.searchHashHex,
     recorderName: treasure.recorderName,
+    recorderNarrator: recorderNarrator(treasure),
     status: treasure.status,
     createdAt: treasure.createdAt,
     collectedAt: treasure.collectedAt,
@@ -204,6 +253,7 @@ export async function listNodeTreasures(nodeId: string) {
     subjectGroup: treasure.subjectGroup,
     instanceNumber: treasure.instanceNumber,
     recorderName: treasure.recorderName,
+    recorderNarrator: recorderNarrator(treasure),
     status: treasure.status,
     createdAt: treasure.createdAt,
     collectedAt: treasure.collectedAt,
@@ -219,36 +269,40 @@ export async function getCollectedTreasure(id: string) {
   if (!treasure) throw new ApiFailure("TREASURE_NOT_FOUND", "宝物不存在或尚未被收录。", 404);
   const results = await db().batch([
     db().prepare(`SELECT d.id,d.treasure_id AS treasureId,d.body,d.author_label AS authorLabel,d.status,d.kind,d.created_at AS createdAt,
+      ${descriptionNarratorColumns},
       (SELECT COUNT(*) FROM treasure_description_feedback f WHERE f.description_id=d.id AND f.is_true=1) AS trueCount,
       (SELECT COUNT(*) FROM treasure_description_feedback f WHERE f.description_id=d.id AND f.is_true=0) AS falseCount
-      FROM treasure_descriptions d WHERE d.treasure_id=? AND d.status='VISIBLE' ORDER BY d.created_at,d.id`).bind(id),
+      FROM treasure_descriptions d LEFT JOIN narrators narrator ON narrator.id=d.narrator_id
+      WHERE d.treasure_id=? AND d.status='VISIBLE' ORDER BY d.created_at,d.id`).bind(id),
     db().prepare(`SELECT ${imageColumns} FROM treasure_images WHERE treasure_id=? ORDER BY is_primary DESC,created_at DESC`).bind(id),
   ]);
-  const { tokensJson, ...publicTreasure } = treasure;
+  const publicTreasure = serializeHostedTreasure(treasure);
+  const { tokensJson, ...treasureWithoutTokens } = publicTreasure;
   return {
-    treasure: { ...publicTreasure, tokens: JSON.parse(tokensJson) as TreasureToken[] },
+    treasure: { ...treasureWithoutTokens, tokens: JSON.parse(tokensJson) as TreasureToken[] },
     descriptions: (results[0].results as unknown as HostedTreasureDescription[]).map((item) => ({
-      ...item, trueCount: Number(item.trueCount), falseCount: Number(item.falseCount),
+      ...normalizeTreasureDescription(item), trueCount: Number(item.trueCount), falseCount: Number(item.falseCount),
     })),
     images: (results[1].results as unknown as HostedTreasureImage[]).map(normalizeImage),
   };
 }
 
-export async function collectTreasure(id: string, recorderName?: string) {
+export async function collectTreasure(id: string, attribution: NarratorAttribution) {
   await ensureHostedSchema();
   const treasure = await getTreasureInternal(id);
   if (!treasure) throw new ApiFailure("TREASURE_NOT_FOUND", "没有找到这件候选宝物。", 404);
   if (treasure.status === "COLLECTED") return getCollectedTreasure(id);
   const image = await first<{ id: string }>(db().prepare("SELECT id FROM treasure_images WHERE treasure_id=? AND status='COMPLETED' LIMIT 1").bind(id));
   if (!image) throw new ApiFailure("TREASURE_IMAGE_NOT_READY", "宝物的视觉解释尚未完成，暂时不能收录。", 409);
-  const recorder = recorderName?.trim() || "匿名";
+  const recorder = attribution.authorLabel?.trim() || "匿名";
   const collectedAt = new Date().toISOString();
   const descriptionId = `treasure-discovery:${id}`;
   const body = `${treasure.name} 由 ${recorder} 从 ${treasure.ownerName} 的命运中寻得，并收入宝物图鉴。`;
   await db().batch([
-    db().prepare("UPDATE treasures SET status='COLLECTED',recorder_name=?,collected_at=? WHERE id=? AND status='PENDING'").bind(recorder, collectedAt, id),
-    db().prepare(`INSERT OR IGNORE INTO treasure_descriptions (id,treasure_id,body,author_label,status,kind,created_at)
-      VALUES (?,?,?,?, 'VISIBLE','DISCOVERY',?)`).bind(descriptionId, id, body, recorder, collectedAt),
+    db().prepare("UPDATE treasures SET status='COLLECTED',recorder_name=?,recorder_narrator_id=?,collected_at=? WHERE id=? AND status='PENDING'")
+      .bind(recorder, attribution.narratorId, collectedAt, id),
+    db().prepare(`INSERT OR IGNORE INTO treasure_descriptions (id,treasure_id,body,author_label,narrator_id,status,kind,created_at)
+      VALUES (?,?,?,?,?, 'VISIBLE','DISCOVERY',?)`).bind(descriptionId, id, body, recorder, attribution.narratorId, collectedAt),
   ]);
   return getCollectedTreasure(id);
 }
@@ -262,7 +316,7 @@ export async function updateTreasureTitle(id: string, title: string) {
   return getCollectedTreasure(id);
 }
 
-export async function addTreasureDescription(treasureId: string, body: string, authorLabel?: string) {
+export async function addTreasureDescription(treasureId: string, body: string, attribution: NarratorAttribution) {
   await ensureHostedSchema();
   const treasure = await first<{ id: string }>(db().prepare("SELECT id FROM treasures WHERE id=? AND status='COLLECTED'").bind(treasureId));
   if (!treasure) throw new ApiFailure("TREASURE_NOT_FOUND", "宝物不存在或尚未被收录。", 404);
@@ -270,12 +324,14 @@ export async function addTreasureDescription(treasureId: string, body: string, a
   const recent = await all<{ body: string }>(db().prepare("SELECT body FROM treasure_descriptions WHERE treasure_id=? AND created_at>=?").bind(treasureId, since));
   if (recent.some((item) => item.body.normalize("NFKC").toLowerCase() === body.normalize("NFKC").toLowerCase()))
     throw new ApiFailure("DUPLICATE_DESCRIPTION", "这条记述最近已经添加过。", 409);
-  const description: HostedTreasureDescription = {
-    id: newId(), treasureId, body, authorLabel: authorLabel || null, status: "VISIBLE", kind: "STORY",
+  const description = {
+    id: newId(), treasureId, body, authorLabel: attribution.authorLabel, narrator: attribution.narrator,
+    status: "VISIBLE", kind: "STORY",
     createdAt: new Date().toISOString(), trueCount: 0, falseCount: 0,
   };
-  await db().prepare(`INSERT INTO treasure_descriptions (id,treasure_id,body,author_label,status,kind,created_at)
-    VALUES (?,?,?,?,?,?,?)`).bind(description.id, treasureId, body, description.authorLabel, description.status, description.kind, description.createdAt).run();
+  await db().prepare(`INSERT INTO treasure_descriptions (id,treasure_id,body,author_label,narrator_id,status,kind,created_at)
+    VALUES (?,?,?,?,?,?,?,?)`).bind(description.id, treasureId, body, description.authorLabel, attribution.narratorId,
+      description.status, description.kind, description.createdAt).run();
   return description;
 }
 

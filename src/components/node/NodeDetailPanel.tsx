@@ -3,6 +3,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AuthorshipControl, useAuthorship } from "@/components/narrator/AuthorshipControl";
+import { NarratorIdentity } from "@/components/narrator/NarratorIdentity";
+import type { PublicNarrator } from "@/lib/narrator/types";
 
 interface DetailToken {
   position: number;
@@ -46,7 +49,7 @@ interface Detail {
   tokens: DetailToken[];
   prompt: string;
   images: Array<{ id: string; imageDataUrl?: string; imageUrl?: string; thumbnailUrl?: string; status: string; provider: string; providerModel?: string; variationId?: string; width?: number; height?: number; createdAt: string }>;
-  descriptions: Array<{ id: string; body: string; authorLabel?: string; kind: RecordKind; createdAt: string; trueCount: number; falseCount: number }>;
+  descriptions: Array<{ id: string; body: string; authorLabel?: string; narrator?: PublicNarrator | null; kind: RecordKind; createdAt: string; trueCount: number; falseCount: number }>;
   treasures: Array<{ id: string; name: string; title?: string | null; subjectName: string; subjectGroup: string; descriptions: number; imageCount: number }>;
 }
 
@@ -80,10 +83,13 @@ const recordColors: Record<RecordKind, string> = {
 
 function DescriptionRecord({ item, onVote }: { item: Detail["descriptions"][number]; onVote: (id: string, isTrue: boolean) => void }) {
   const disputed = item.falseCount > item.trueCount;
+  const body = item.narrator && item.body.includes(item.narrator.name)
+    ? item.body.split(item.narrator.name).map((part, index, parts) => <span key={`${index}:${part}`}>{part}{index < parts.length - 1 && <NarratorIdentity narrator={item.narrator!} />}</span>)
+    : item.body;
   const content = <>
     <div className="flex items-center justify-between gap-3"><span className={`rounded-full border px-2 py-1 text-[10px] ${recordColors[item.kind]}`}>{recordLabels[item.kind]}</span><span className="text-[10px] text-slate-600">不可修改 · 不可删除</span></div>
-    <p className="mt-3 whitespace-pre-wrap leading-6">{item.body}</p>
-    <p className="mt-2 text-xs text-slate-500">{item.authorLabel || "匿名记录者"} · {new Date(item.createdAt).toLocaleString()}</p>
+    <p className="mt-3 whitespace-pre-wrap leading-6">{body}</p>
+    <div className="mt-2 flex items-start gap-1 text-xs text-slate-500">{item.narrator ? <NarratorIdentity narrator={item.narrator} /> : <span>{item.authorLabel || "匿名记录者"}</span>}<span>· {new Date(item.createdAt).toLocaleString()}</span></div>
     <div className="mt-3 flex gap-2 text-xs"><button type="button" onClick={() => onVote(item.id, true)} className="min-h-9 rounded-lg border border-emerald-400/20 px-3 text-emerald-300">真实 · {item.trueCount}</button><button type="button" onClick={() => onVote(item.id, false)} className="min-h-9 rounded-lg border border-red-400/20 px-3 text-red-300">虚假 · {item.falseCount}</button></div>
   </>;
   if (disputed) return <details className="rounded-xl border border-slate-600/30 bg-slate-950/40 p-3 text-sm"><summary className="cursor-pointer text-xs text-slate-400">该记述因“虚假”评价更多而折叠 · 展开查看</summary><div className="mt-3 border-t border-white/5 pt-3">{content}</div></details>;
@@ -112,7 +118,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [body, setBody] = useState("");
-  const [authorLabel, setAuthorLabel] = useState("");
+  const authorship = useAuthorship();
   const [lifeBody, setLifeBody] = useState("");
   const [lifeBusy, setLifeBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -132,10 +138,13 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
 
   async function addDescription(event: React.FormEvent) {
     event.preventDefault(); setMessage("");
-    const response = await fetch(`/api/nodes/${nodeId}/descriptions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body, ...(authorLabel ? { authorLabel } : {}) }) });
+    const authorMode = authorship.narrator && authorship.mode === "narrator" ? "narrator" : "custom";
+    const response = await fetch(`/api/nodes/${nodeId}/descriptions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+      body, authorMode, ...(authorMode === "custom" && authorship.customLabel ? { authorLabel: authorship.customLabel } : {}),
+    }) });
     const result = await response.json() as { error?: { message?: string } };
     if (!response.ok) return setMessage(result.error?.message ?? "提交失败");
-    setBody(""); setAuthorLabel(""); setMessage("记述已追加且永久保存，不会改变该存在的基因与图片 Prompt。"); void load(true); onNodeChanged?.();
+    setBody(""); authorship.setCustomLabel(""); setMessage("记述已追加且永久保存，不会改变该存在的基因与图片 Prompt。"); void load(true); onNodeChanged?.();
   }
 
   async function changeLifeStatus(event: React.FormEvent) {
@@ -185,7 +194,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
   const recordSection = <section className="mt-6 rounded-2xl border border-white/10 bg-black/10 p-4 sm:mt-7">
     <div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">记述 · {detail.descriptions.length}</h2><p className="mt-1 text-xs text-slate-500">用户对存在故事的追加记录；一经提交，不可修改或删除。</p></div><span className={`rounded-full border px-3 py-1 text-xs ${node.isDead ? "border-slate-500/40 text-slate-300" : "border-emerald-400/30 text-emerald-300"}`}>{node.isDead ? "死亡" : "存活"}</span></div>
     {node.recordsLocked ? <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs leading-5 text-amber-200">该存在的故事已永久封存：不能追加记述、复活或参与繁衍。</p> : <>
-      <form onSubmit={addDescription} className="mt-4 space-y-2"><textarea aria-label="记述" required maxLength={500} value={body} onChange={(event) => setBody(event.target.value)} placeholder="为这个实体追加纯文本记述" className="h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"/><input aria-label="署名" maxLength={64} value={authorLabel} onChange={(event) => setAuthorLabel(event.target.value)} placeholder="可选署名" className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"/><button className="min-h-11 w-full rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-950 sm:w-auto">追加记述</button></form>
+      <form onSubmit={addDescription} className="mt-4 space-y-2"><textarea aria-label="记述" required maxLength={500} value={body} onChange={(event) => setBody(event.target.value)} placeholder="为这个实体追加纯文本记述" className="h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"/><AuthorshipControl mode={authorship.mode} setMode={authorship.setMode} customLabel={authorship.customLabel} setCustomLabel={authorship.setCustomLabel} /><button className="min-h-11 w-full rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-950 sm:w-auto">追加记述</button></form>
       <form onSubmit={changeLifeStatus} className={`mt-4 rounded-xl border p-3 ${node.isDead ? "border-white/15 bg-white/[.03]" : "border-red-400/20 bg-red-400/5"}`}><label className="text-xs text-slate-400">{node.isDead ? "复活记述（必填）" : "死亡记述（必填）"}<textarea aria-label={node.isDead ? "复活记述" : "死亡记述"} required maxLength={500} value={lifeBody} onChange={(event) => setLifeBody(event.target.value)} placeholder={node.isDead ? "记录该存在如何重新回到世界" : "记录该存在如何离开世界"} className="mt-2 h-20 w-full resize-none rounded-lg border border-white/10 bg-slate-950 p-3 text-sm" /></label><button disabled={lifeBusy || !lifeBody.trim()} className={`mt-2 min-h-11 w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-40 ${node.isDead ? "bg-white text-slate-950" : "bg-red-600 text-white"}`}>{lifeBusy ? "正在确认…" : node.isDead ? "确认复活" : "确认死亡"}</button></form>
     </>}
     {message && <p className="mt-3 text-xs leading-5 text-cyan-300">{message}</p>}

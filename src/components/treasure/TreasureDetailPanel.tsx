@@ -3,12 +3,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AuthorshipControl, useAuthorship } from "@/components/narrator/AuthorshipControl";
+import { NarratorIdentity } from "@/components/narrator/NarratorIdentity";
 import { splitFaustExistenceNames, type FaustExistenceLink } from "@/lib/faust-markdown";
+import type { PublicNarrator } from "@/lib/narrator/types";
 import type { TreasureToken } from "@/lib/treasure/protocol";
 
-interface RecordItem { id: string; body: string; authorLabel?: string | null; kind: "DISCOVERY" | "STORY"; createdAt: string; trueCount: number; falseCount: number }
+interface RecordItem { id: string; body: string; authorLabel?: string | null; narrator?: PublicNarrator | null; kind: "DISCOVERY" | "STORY"; createdAt: string; trueCount: number; falseCount: number }
 interface Detail {
-  treasure: { id: string; name: string; title?: string | null; protocolVersion: string; ownerName: string; ownerNodeId: string; subjectName: string; subjectGroup: string; recorderName?: string | null; searchHashHex: string; ownerFeatureHex: string; matchScore: number; searchAttempt: number; searchTimestampMs: string; exactPrompt: string; collectedAt?: string | null; tokens: TreasureToken[] };
+  treasure: { id: string; name: string; title?: string | null; protocolVersion: string; ownerName: string; ownerNodeId: string; subjectName: string; subjectGroup: string; recorderName?: string | null; recorderNarrator?: PublicNarrator | null; searchHashHex: string; ownerFeatureHex: string; matchScore: number; searchAttempt: number; searchTimestampMs: string; exactPrompt: string; collectedAt?: string | null; tokens: TreasureToken[] };
   descriptions: RecordItem[];
   images: Array<{ id: string; imageUrl?: string | null; thumbnailUrl?: string | null; provider: string; providerModel?: string | null; width?: number | null; height?: number | null }>;
 }
@@ -19,9 +22,14 @@ function LinkedWorldText({ text, links }: { text: string; links: FaustExistenceL
     : <span key={`text:${index}`}>{segment.text}</span>)}</>;
 }
 
+function LinkedRecordText({ text, narrator, links }: { text: string; narrator?: PublicNarrator | null; links: FaustExistenceLink[] }) {
+  if (!narrator || !text.includes(narrator.name)) return <LinkedWorldText text={text} links={links} />;
+  return <>{text.split(narrator.name).map((part, index, parts) => <span key={`${index}:${part}`}><LinkedWorldText text={part} links={links} />{index < parts.length - 1 && <NarratorIdentity narrator={narrator} />}</span>)}</>;
+}
+
 function TreasureRecord({ item, onVote, links }: { item: RecordItem; onVote: (id: string, isTrue: boolean) => void; links: FaustExistenceLink[] }) {
   const disputed = item.falseCount > item.trueCount;
-  const content = <><div className="flex items-center justify-between"><span className="rounded-full border border-emerald-300/20 px-2 py-1 text-[10px] text-emerald-200">{item.kind === "DISCOVERY" ? "收录" : "记述"}</span><span className="text-[10px] text-slate-600">不可修改 · 不可删除</span></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-200"><LinkedWorldText text={item.body} links={links} /></p><p className="mt-2 text-xs text-slate-500"><LinkedWorldText text={item.authorLabel || "匿名记录者"} links={links} /> · {new Date(item.createdAt).toLocaleString()}</p><div className="mt-3 flex gap-2 text-xs"><button type="button" onClick={() => onVote(item.id, true)} className="min-h-9 rounded-lg border border-emerald-400/20 px-3 text-emerald-300">真实 · {item.trueCount}</button><button type="button" onClick={() => onVote(item.id, false)} className="min-h-9 rounded-lg border border-red-400/20 px-3 text-red-300">虚假 · {item.falseCount}</button></div></>;
+  const content = <><div className="flex items-center justify-between"><span className="rounded-full border border-emerald-300/20 px-2 py-1 text-[10px] text-emerald-200">{item.kind === "DISCOVERY" ? "收录" : "记述"}</span><span className="text-[10px] text-slate-600">不可修改 · 不可删除</span></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-200"><LinkedRecordText text={item.body} narrator={item.narrator} links={links} /></p><div className="mt-2 flex items-start gap-1 text-xs text-slate-500">{item.narrator ? <NarratorIdentity narrator={item.narrator} /> : <span>{item.authorLabel || "匿名记录者"}</span>}<span>· {new Date(item.createdAt).toLocaleString()}</span></div><div className="mt-3 flex gap-2 text-xs"><button type="button" onClick={() => onVote(item.id, true)} className="min-h-9 rounded-lg border border-emerald-400/20 px-3 text-emerald-300">真实 · {item.trueCount}</button><button type="button" onClick={() => onVote(item.id, false)} className="min-h-9 rounded-lg border border-red-400/20 px-3 text-red-300">虚假 · {item.falseCount}</button></div></>;
   return disputed ? <details className="rounded-xl border border-slate-600/30 bg-slate-950/40 p-3"><summary className="cursor-pointer text-xs text-slate-400">该记述因“虚假”评价更多而折叠 · 展开查看</summary><div className="mt-3 border-t border-white/5 pt-3">{content}</div></details> : <article className="rounded-xl border border-white/10 p-3">{content}</article>;
 }
 
@@ -33,7 +41,7 @@ export function TreasureDetailPanel({ treasureId }: { treasureId: string }) {
   const [titleBusy, setTitleBusy] = useState(false);
   const [titleMessage, setTitleMessage] = useState("");
   const [body, setBody] = useState("");
-  const [authorLabel, setAuthorLabel] = useState("");
+  const authorship = useAuthorship();
   const [message, setMessage] = useState("");
   const load = useCallback(async () => {
     const response = await fetch(`/api/treasures/${treasureId}`, { cache: "no-store" });
@@ -77,9 +85,12 @@ export function TreasureDetailPanel({ treasureId }: { treasureId: string }) {
 
   async function addDescription(event: React.FormEvent) {
     event.preventDefault(); setMessage("");
-    const response = await fetch(`/api/treasures/${treasureId}/descriptions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body, ...(authorLabel ? { authorLabel } : {}) }) });
+    const authorMode = authorship.narrator && authorship.mode === "narrator" ? "narrator" : "custom";
+    const response = await fetch(`/api/treasures/${treasureId}/descriptions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+      body, authorMode, ...(authorMode === "custom" && authorship.customLabel ? { authorLabel: authorship.customLabel } : {}),
+    }) });
     const result = await response.json() as { error?: { message?: string } };
-    if (!response.ok) setMessage(result.error?.message ?? "提交失败"); else { setBody(""); setAuthorLabel(""); setMessage("记述已永久追加。"); await load(); }
+    if (!response.ok) setMessage(result.error?.message ?? "提交失败"); else { setBody(""); authorship.setCustomLabel(""); setMessage("记述已永久追加。"); await load(); }
   }
   async function vote(descriptionId: string, isTrue: boolean) {
     let voterKey = window.localStorage.getItem("eros-anonymous-voter");
@@ -107,10 +118,10 @@ export function TreasureDetailPanel({ treasureId }: { treasureId: string }) {
         <div className="flex gap-2"><button disabled={titleBusy} className="min-h-11 flex-1 rounded-xl bg-emerald-100 px-4 text-sm font-semibold text-[#0b120f] disabled:opacity-40 sm:flex-none">{titleBusy ? "保存中…" : "保存称号"}</button><button type="button" disabled={titleBusy} onClick={() => { setTitleDraft(treasure.title ?? ""); setEditingTitle(false); setTitleMessage(""); }} className="min-h-11 flex-1 rounded-xl border border-white/10 px-4 text-sm text-slate-400 sm:flex-none">取消</button></div>
       </form> : <div className="mt-2 flex min-h-7 items-center gap-3"><p className="min-w-0 flex-1 truncate text-sm italic text-emerald-100/60">{treasure.title ?? ""}</p><button type="button" onClick={() => { setEditingTitle(true); setTitleMessage(""); }} className="shrink-0 text-xs text-emerald-300 hover:text-emerald-200">{treasure.title ? "修改称号" : "设置称号"}</button></div>}
       {titleMessage && <p className="mt-1 text-xs text-cyan-300">{titleMessage}</p>}
-      <p className="mt-2 text-sm text-slate-500">持有存在 · <Link href={`/nodes/${treasure.ownerNodeId}`} className="font-semibold text-cyan-300">{treasure.ownerName}</Link> · 记述人 <LinkedWorldText text={treasure.recorderName ?? "匿名"} links={links} /></p>
+      <div className="mt-2 flex flex-wrap items-start gap-1 text-sm text-slate-500"><span>持有存在 · <Link href={`/nodes/${treasure.ownerNodeId}`} className="font-semibold text-cyan-300">{treasure.ownerName}</Link> · 记述人</span>{treasure.recorderNarrator ? <NarratorIdentity narrator={treasure.recorderNarrator} /> : <span>{treasure.recorderName ?? "匿名"}</span>}</div>
     </div>
     {primaryImage && <figure className="mt-6"><img src={primaryImage.thumbnailUrl ?? primaryImage.imageUrl ?? ""} alt={treasure.name} width={512} height={320} className="mx-auto h-auto max-h-[70vh] max-w-full rounded-2xl border border-white/10 bg-black object-contain"/><figcaption className="mt-2 text-center text-[10px] text-slate-500">{primaryImage.width && primaryImage.height ? `${primaryImage.width}×${primaryImage.height}` : "原始尺寸"}{primaryImage.imageUrl && <a href={primaryImage.imageUrl} target="_blank" rel="noreferrer" className="ml-2 text-cyan-300">查看原图</a>}</figcaption></figure>}
-    <section className="mt-7 rounded-2xl border border-white/10 bg-black/10 p-4"><h2 className="font-semibold">记述 · {detail.descriptions.length}</h2><p className="mt-1 text-xs text-slate-500">宝物故事的追加记录；一经提交，不可修改或删除。</p><form onSubmit={addDescription} className="mt-4 space-y-2"><textarea required maxLength={500} value={body} onChange={(event) => setBody(event.target.value)} placeholder="为这件宝物追加纯文本记述" aria-label="宝物记述" className="h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"/><input maxLength={64} value={authorLabel} onChange={(event) => setAuthorLabel(event.target.value)} placeholder="可选署名" aria-label="署名" className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"/><button className="min-h-11 w-full rounded-xl bg-white px-4 text-sm font-medium text-slate-950 sm:w-auto">追加记述</button></form>{message && <p className="mt-3 text-xs text-cyan-300">{message}</p>}<div className="mt-4 space-y-2">{detail.descriptions.map((item) => <TreasureRecord key={item.id} item={item} onVote={vote} links={links}/>)}</div></section>
+    <section className="mt-7 rounded-2xl border border-white/10 bg-black/10 p-4"><h2 className="font-semibold">记述 · {detail.descriptions.length}</h2><p className="mt-1 text-xs text-slate-500">宝物故事的追加记录；一经提交，不可修改或删除。</p><form onSubmit={addDescription} className="mt-4 space-y-2"><textarea required maxLength={500} value={body} onChange={(event) => setBody(event.target.value)} placeholder="为这件宝物追加纯文本记述" aria-label="宝物记述" className="h-24 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"/><AuthorshipControl mode={authorship.mode} setMode={authorship.setMode} customLabel={authorship.customLabel} setCustomLabel={authorship.setCustomLabel} /><button className="min-h-11 w-full rounded-xl bg-white px-4 text-sm font-medium text-slate-950 sm:w-auto">追加记述</button></form>{message && <p className="mt-3 text-xs text-cyan-300">{message}</p>}<div className="mt-4 space-y-2">{detail.descriptions.map((item) => <TreasureRecord key={item.id} item={item} onVote={vote} links={links}/>)}</div></section>
     <section className="mt-7"><h2 className="font-semibold">确定性宝物特征</h2><p className="hash mt-3 break-all rounded-xl bg-black/25 p-3 text-xs text-slate-500">128-bit · {treasure.searchHashHex}</p><p className="mt-2 text-xs text-slate-500">第 {treasure.searchAttempt} 次匹配 · 与 <Link href={`/nodes/${treasure.ownerNodeId}`} className="font-semibold text-cyan-300">{treasure.ownerName}</Link> {treasure.protocolVersion === "eros-treasure-v1" ? `共同为 1 的 bit：${treasure.matchScore}` : `相同的 bit：${treasure.matchScore}/128`}</p><div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">{treasure.tokens.map((token) => <article key={token.position} className="rounded-xl border border-white/10 p-3"><div className="flex justify-between text-[10px] text-slate-600"><span>#{token.position} · {token.familyZh}</span><code>{token.tokenHex}</code></div><p className="mt-2 text-sm text-slate-200">{token.phraseZh}</p><p className="mt-1 text-xs text-slate-500">{token.phrase}</p></article>)}</div></section>
     <details className="mt-7 rounded-2xl border border-white/10 p-4"><summary className="cursor-pointer text-sm text-emerald-200">展开图片生成 Prompt</summary><pre className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-500">{treasure.exactPrompt}</pre></details>
   </article></main>;
