@@ -124,7 +124,7 @@ export function NodeDetailPanel({ nodeId, initialNode, onClose, onSelectParent, 
   const [message, setMessage] = useState("");
   const containerClassName = standalone
     ? "glass rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:p-6"
-    : "glass fixed inset-x-0 bottom-0 top-14 z-40 w-full overflow-y-auto overscroll-contain border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:p-6 md:inset-y-16 md:left-auto md:right-0 md:max-w-xl md:border-l md:border-t-0";
+    : "glass fixed inset-x-0 bottom-0 top-14 z-[80] w-full overflow-y-auto overscroll-contain border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:p-6 md:inset-y-16 md:left-auto md:right-0 md:max-w-xl md:border-l md:border-t-0";
   const load = useCallback(async (force = false) => setDetail(await requestDetail(nodeId, force)), [nodeId]);
   useEffect(() => { setDetail(detailCache.get(nodeId) ?? null); void load(); }, [load, nodeId]);
   useEffect(() => {
