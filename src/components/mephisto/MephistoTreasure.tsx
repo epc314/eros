@@ -4,6 +4,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AuthorshipControl, useAuthorship } from "@/components/narrator/AuthorshipControl";
+import { NarratorIdentity } from "@/components/narrator/NarratorIdentity";
+import type { PublicNarrator } from "@/lib/narrator/types";
 import { MEPHISTO_GREETING, type TreasureToken } from "@/lib/treasure/protocol";
 
 interface Match { id: string; name: string; score: number; featureHex: string }
@@ -14,6 +16,7 @@ interface TreasureCandidate {
   id: string; name: string; ownerName: string; ownerNodeId: string; protocolVersion?: string; subjectName: string; subjectGroup: string;
   searchHashHex: string; matchScore: number; status: "PENDING" | "COLLECTED"; tokens: TreasureToken[];
   recorderName?: string | null;
+  recorderNarrator?: PublicNarrator | null;
 }
 
 export function MephistoTreasure() {
@@ -47,7 +50,8 @@ export function MephistoTreasure() {
   }, []);
 
   function reset() {
-    setSpell(""); setActiveSpell(""); setSearch(null); setCandidate(null); setImages([]); authorship.setCustomLabel(""); setPhase("idle"); setError("");
+    setSpell(""); setActiveSpell(""); setSearch(null); setCandidate(null); setImages([]); authorship.setCustomLabel("");
+    authorship.setMode(authorship.narrator ? "narrator" : "custom"); setPhase("idle"); setError("");
   }
 
   async function generate(owner: Match, currentSearch: SearchResult, currentSpell: string) {
@@ -140,7 +144,7 @@ export function MephistoTreasure() {
           <p className="mt-2 text-xs text-slate-500">持有存在 · <Link className="text-cyan-300" href={`/nodes/${candidate.ownerNodeId}`}>{candidate.ownerName}</Link> · {candidate.protocolVersion === "eros-treasure-v1" ? `共同为 1：${candidate.matchScore} bit` : `相同：${candidate.matchScore}/128 bit`}</p>
           <details className="mt-3 rounded-xl border border-white/10 p-3"><summary className="cursor-pointer text-xs text-emerald-200">查看 128-bit 与确定性特征</summary><p className="hash mt-2 break-all text-[10px] text-slate-600">{candidate.searchHashHex}</p><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">{candidate.tokens.map((token) => <div key={token.position} className="contents"><dt className="text-slate-500">{token.familyZh}</dt><dd className="text-slate-300">{token.phraseZh}</dd></div>)}</dl></details>
           {phase === "candidate" ? <div className="mt-4"><AuthorshipControl label="收录署名" mode={authorship.mode} setMode={authorship.setMode} customLabel={authorship.customLabel} setCustomLabel={authorship.setCustomLabel} /><button type="button" onClick={() => void collect()} className="mt-2 min-h-11 w-full rounded-xl bg-emerald-100 px-4 text-sm font-semibold text-[#0b120f]">收录</button></div>
-            : <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3 text-sm text-emerald-200">已收入宝物图鉴 · <Link className="underline" href={`/treasures/${candidate.id}`}>打开详细记录</Link></div>}
+            : <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3 text-sm text-emerald-200"><div className="flex flex-wrap items-start gap-1"><span>收录署名 ·</span>{candidate.recorderNarrator ? <NarratorIdentity narrator={candidate.recorderNarrator} /> : <span className="text-slate-300">{candidate.recorderName ?? "匿名"}</span>}</div><div className="mt-2">已收入宝物图鉴 · <Link className="underline" href={`/treasures/${candidate.id}`}>打开详细记录</Link></div></div>}
         </div>
       </section>}
       {error && <p className="rounded-xl border border-red-400/15 bg-red-400/5 p-3 text-xs leading-5 text-red-200">{error}</p>}
