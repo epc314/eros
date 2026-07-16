@@ -412,6 +412,7 @@ export async function setHostedDescriptionFeedback(descriptionId: string, voterK
 
 const BACKUP_TABLES = [
   "narrators",
+  "narrator_sessions",
   "worlds", "nodes", "reproductions", "parent_edges", "node_descriptions", "description_feedback", "generated_images",
   "treasures", "treasure_descriptions", "treasure_description_feedback", "treasure_images",
   "proposal_posts", "proposal_replies", "proposal_likes",
